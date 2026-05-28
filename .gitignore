@@ -1,0 +1,19 @@
+# FERPA: never commit student data or operator workbooks.
+# The app reads/writes these locally in the browser; they must stay off GitHub.
+*.xlsx
+*.xls
+*.csv
+*.numbers
+/data/
+/workbooks/
+
+# Allow de-identified templates/fixtures only if explicitly named *.template.*
+!*.template.xlsx
+!*.template.csv
+
+# OS / editor cruft
+Thumbs.db
+.DS_Store
+*~
+.vscode/
+.idea/
