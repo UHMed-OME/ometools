@@ -39,7 +39,7 @@
     .masthead { min-width: 0; }
     h1 { margin: 0; font-size: 1.3rem; letter-spacing: 0.01em; font-weight: 700; color: var(--brand-dark); }
     .tag { color: var(--muted); margin: 0.15rem 0 0; font-size: 0.9rem; }
-    main { padding: 1.25rem 1.5rem 4rem; max-width: 1240px; }
+    main { padding: 1.25rem 1.5rem 4rem; max-width: 1240px; margin: 0 auto; }
     .toolbar {
       display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center;
       padding: 1rem 0; border-bottom: 1px solid var(--line); margin-bottom: 1.25rem;
@@ -158,10 +158,23 @@
     .ghead .gtutors { font-size: 0.88rem; color: var(--accent); font-weight: 600; margin-top: 0.15rem; }
     .gbody { padding: 0.55rem; display: flex; flex-direction: column; gap: 0.4rem; min-height: 48px; }
     .chip { padding: 0.45rem 0.6rem; border-radius: 7px; background: var(--surface);
-      border: 1px solid var(--line); font-size: 0.9rem; }
+      border: 1px solid var(--line); font-size: 0.9rem; cursor: grab; }
+    .chip:active { cursor: grabbing; }
+    .chip.dragging { opacity: 0.5; }
+    .chip.flag { border-color: var(--err); background: var(--err-bg); }
+    .chip.locked { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+    .chip .chip-row { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
     .chip .cname { font-weight: 600; }
     .chip .ctags { color: var(--muted); font-size: 0.8rem; margin-top: 0.1rem; }
+    .lockbtn { border: none; background: transparent; cursor: pointer; padding: 0 0.1rem;
+      font-size: 0.95rem; line-height: 1; opacity: 0.55; filter: grayscale(1); }
+    .lockbtn:hover { opacity: 1; filter: none; background: transparent; }
+    .chip.locked .lockbtn { opacity: 1; filter: none; }
+    .gcol.dragover { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-bg); }
+    .gcol.dragover .gbody { background: var(--accent-bg); }
     .gcount { font-size: 0.82rem; color: var(--muted); padding: 0 0.8rem 0.6rem; }
+    .board-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin: 0.2rem 0 0.9rem; }
+    .board-actions .hint { flex: 1 1 280px; }
   </style>
 </head>
 <body>
@@ -229,6 +242,11 @@
         </details>
       </div>
       <div id="scorecard"></div>
+      <div id="boardActions" class="board-actions hidden">
+        <span class="hint" style="margin:0">Drag a student between groups to adjust. A red chip breaks a hard rule (hover for why). Lock 🔒 anyone you want kept in place, then re-solve.</span>
+        <button id="btnResolve">↻ Re-solve (keep locked)</button>
+        <button id="btnUnlockAll">Unlock all</button>
+      </div>
       <div id="board"></div>
     </section>
 
@@ -910,15 +928,20 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   }
 
   // Greedy seed: place most-constrained students (fewest legal groups) first.
-  function seed(students, groups, idx, rng) {
+  // lockMap (studentId -> groupIndex) pins students in place; they're placed first
+  // and not reconsidered, so the rest are seeded around them.
+  function seed(students, groups, idx, rng, lockMap) {
     const assign = groups.map(() => []);
+    const locked = lockMap || new Map();
+    for (const [sid, gi] of locked) if (groups[gi]) assign[gi].push(sid);
+    const free = students.filter(s => !locked.has(norm(s.StudentID)));
     const dom = new Map();
-    for (const s of students) {
+    for (const s of free) {
       const sid = norm(s.StudentID);
       const d = []; groups.forEach((g, gi) => { if (!staticViolation(s, g, idx)) d.push(gi); });
       dom.set(sid, d);
     }
-    const order = students.map(s => norm(s.StudentID))
+    const order = free.map(s => norm(s.StudentID))
       .sort((a, b) => (dom.get(a).length - dom.get(b).length) || (rng() - 0.5));
     const violations = [];
     for (const sid of order) {
@@ -955,7 +978,9 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
 
   // Hill-climbing local search: random moves/swaps that preserve all hard constraints
   // and lower total soft penalty; snapshot-and-revert on reject. Keep the best seen.
-  function optimize(seedAssign, groups, idx, w, rng, iters) {
+  // Locked students (lockedSids) are never moved or swapped.
+  function optimize(seedAssign, groups, idx, w, rng, iters, lockedSids) {
+    const locked = lockedSids || new Set();
     let assign = seedAssign.map(a => a.slice());
     let cur = penaltyOf(metricsOf(assign, groups, idx), w);
     let best = assign.map(a => a.slice()), bestP = cur;
@@ -966,6 +991,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
       if (gj === gi) continue;
       const si = Math.floor(rng() * assign[gi].length);
       const sid = assign[gi][si];
+      if (locked.has(sid)) continue;
       const s = idx.studentsById.get(sid);
       const snap = assign.map(a => a.slice());
       let moved = false;
@@ -974,6 +1000,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
       } else if (assign[gj].length) {
         const sj = Math.floor(rng() * assign[gj].length);
         const oid = assign[gj][sj], o = idx.studentsById.get(oid);
+        if (locked.has(oid)) continue;
         const gjOthers = assign[gj].filter((_, k) => k !== sj);
         const giOthers = assign[gi].filter((_, k) => k !== si);
         if (!staticViolation(s, groups[gj], idx) && !staticViolation(o, groups[gi], idx) &&
@@ -1006,7 +1033,8 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   }
 
   // Top-level solve: many seeded restarts, keep the run with fewest hard relaxations then lowest penalty.
-  function solve(wb, unit, weights) {
+  // `locks` (optional Map studentId -> GroupID) pins students to a group across the re-solve.
+  function solve(wb, unit, weights, locks) {
     const idx = buildIndex(wb);
     idx.prior = priorData(idx.history, unit);
     const groups = groupsForUnit(wb, unit, idx.tutorsById);
@@ -1016,13 +1044,19 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
       return { unit, groups: [], violations: [], capacityShortfall: students.length,
                scorecard: null, error: `No groups are defined for ${unit}. Add rows to the Groups sheet for this unit.` };
 
+    // Resolve lock GroupIDs to indices for this unit's groups.
+    const gidIndex = new Map(groups.map((g, gi) => [g.GroupID, gi]));
+    const lockMap = new Map(), lockedSids = new Set();
+    if (locks) for (const [sid, gid] of locks)
+      if (gidIndex.has(gid)) { lockMap.set(sid, gidIndex.get(gid)); lockedSids.add(sid); }
+
     const totalCap = groups.reduce((a, g) => a + g.capacity, 0);
     let bestRun = null;
     const RESTARTS = 12;
     for (let r = 0; r < RESTARTS; r++) {
       const rng = mulberry32(0x9E3779B9 ^ (r * 2654435761));
-      const { assign, violations } = seed(students, groups, idx, rng);
-      const opt = optimize(assign, groups, idx, w, rng, 3000);
+      const { assign, violations } = seed(students, groups, idx, rng, lockMap);
+      const opt = optimize(assign, groups, idx, w, rng, 3000, lockedSids);
       const score = penaltyOf(metricsOf(opt.assign, groups, idx), w);
       if (!bestRun || violations.length < bestRun.violations.length ||
           (violations.length === bestRun.violations.length && score < bestRun.score))
@@ -1036,6 +1070,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
              scorecard: { hard: verifyHard(outGroups, idx), soft: { ...metrics, totalPenalty: bestRun.score } } };
   }
   let lastResult = null;
+  let locked = new Set();      // studentIds pinned in place across a re-solve
 
   // ---- Solver UI ---------------------------------------------------------
   function renderSolverControls() {
@@ -1058,51 +1093,89 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     return w;
   }
 
+  // Render the board + scorecard. Everything (hard flags + soft scores) is recomputed
+  // live from res.groups, so manual drag-moves update instantly without a re-solve.
   function renderResult(res) {
     const sc = $('scorecard'), board = $('board');
-    if (res.error) { sc.innerHTML = `<div class="issue err">${escapeHtml(res.error)}</div>`; board.innerHTML = ''; return; }
-
+    if (res.error) {
+      sc.innerHTML = `<div class="issue err">${escapeHtml(res.error)}</div>`;
+      board.innerHTML = ''; $('boardActions').classList.add('hidden'); return;
+    }
     const students = new Map((workbook.Students || []).map(s => [norm(s.StudentID), s]));
     const tutors = new Map((workbook.Tutors || []).map(t => [norm(t.TutorID), norm(t.Name) || norm(t.TutorID)]));
     const nameOf = (id) => { const s = students.get(id); return s ? (norm(s.Name) || id) : id; };
 
-    const hard = res.scorecard.hard.map(h =>
+    // Live re-validation against the current board state.
+    const idx = buildIndex(workbook);
+    idx.prior = priorData(idx.history, res.unit);
+    const flags = new Map();   // studentId -> { rule, detail }
+    res.groups.forEach(g => {
+      const group = { GroupID: g.GroupID, TimeSlot: g.TimeSlot, tutors: g.tutors, capacity: g.capacity };
+      g.students.forEach((sid, i) => {
+        const s = idx.studentsById.get(sid);
+        let v = s ? staticViolation(s, group, idx) : null;
+        if (!v) { const mm = memberConflict(sid, g.students.filter((_, k) => k !== i), idx);
+                  if (mm) v = { rule: 'Student–student conflict', detail: `with ${nameOf(mm)}` }; }
+        if (v) flags.set(sid, v);
+      });
+    });
+    const assignArr = res.groups.map(g => g.students);
+    const hardChecks = verifyHard(res.groups, idx);
+    const m = metricsOf(assignArr, res.groups, idx);
+    const penalty = penaltyOf(m, getWeights());
+
+    const hard = hardChecks.map(h =>
       `<span class="pill ${h.ok ? 'ok' : 'err'}">${h.ok ? '✓' : '✗'} ${escapeHtml(h.rule)}${h.ok ? '' : ` (${h.violations})`}</span>`).join('');
-    const m = res.scorecard.soft;
     const soft = [
       ['Imi Hoʻōla students doubled-up', m.imiOver],
       ['Non-residents over even share', m.nonResSpread],
       ['Gender imbalance', m.genderImb],
       ['Repeat groupmate pairs', m.repeatPairs],
-      ['Total penalty', m.totalPenalty],
+      ['Total penalty', penalty],
     ].map(([k, v]) => `<span>${escapeHtml(k)}: <b>${v}</b></span>`).join('');
+    const flagList = [...flags.entries()];
     sc.innerHTML =
       `<div class="sc-hard">${hard}</div><div class="sc-soft">${soft}</div>` +
-      (res.violations.length
-        ? `<div class="issue err" style="margin-top:.6rem"><b>${res.violations.length} hard rule(s) had to be relaxed:</b> ` +
-          res.violations.map(v => `${escapeHtml(nameOf(v.studentId))} in ${escapeHtml(v.groupId)} — ${escapeHtml(v.rule)} (${escapeHtml(v.detail)})`).join('; ') +
-          `. Fix the input (add a tutor, resolve a conflict) and re-solve.</div>`
-        : `<div class="issue" style="margin-top:.6rem;background:var(--accent-bg);border-left:3px solid var(--ok)">All hard rules satisfied.</div>`) +
+      (flagList.length
+        ? `<div class="issue err" style="margin-top:.6rem"><b>${flagList.length} student(s) break a hard rule:</b> ` +
+          flagList.map(([sid, v]) => `${escapeHtml(nameOf(sid))} — ${escapeHtml(v.rule)} (${escapeHtml(v.detail)})`).join('; ') +
+          `. Move them, or fix the input and re-solve.</div>`
+        : `<div class="issue" style="margin-top:.6rem;background:var(--accent-bg);border-left:3px solid var(--ok)">✓ All hard rules satisfied.</div>`) +
       (res.capacityShortfall
         ? `<div class="issue warn" style="margin-top:.4rem">${res.capacityShortfall} more student(s) than total seats — add a group or raise a tutor's Max Students.</div>` : '');
 
+    $('boardActions').classList.remove('hidden');
     board.className = 'board';
-    board.innerHTML = res.groups.map(g => {
+    board.innerHTML = res.groups.map((g, gi) => {
       const tnames = g.tutors.map(t => tutors.get(t) || t).join(', ') || '—';
       const chips = g.students.map(sid => {
         const s = students.get(sid) || {};
         const tags = [up(s.Imi) === 'Y' ? 'Imi Hoʻōla' : '', up(s.Resident) === 'N' ? 'Non-resident' : '',
                       genderLabel(s.Gender), norm(s.ScheduleTag) ? tagLabel(s.ScheduleTag) : ''].filter(Boolean).join(' · ');
-        return `<div class="chip"><div class="cname">${escapeHtml(norm(s.Name) || sid)}</div>${tags ? `<div class="ctags">${escapeHtml(tags)}</div>` : ''}</div>`;
-      }).join('') || `<div class="hint" style="margin:0">no students</div>`;
+        const f = flags.get(sid), lk = locked.has(sid);
+        return `<div class="chip${f ? ' flag' : ''}${lk ? ' locked' : ''}" draggable="true" data-sid="${escapeAttr(sid)}"` +
+          (f ? ` title="${escapeAttr(f.rule + ': ' + f.detail)}"` : '') + `>` +
+          `<div class="chip-row"><span class="cname">${escapeHtml(norm(s.Name) || sid)}</span>` +
+          `<button class="lockbtn" data-sid="${escapeAttr(sid)}" title="${lk ? 'Locked — kept in place on re-solve' : 'Lock in place'}">${lk ? '🔒' : '🔓'}</button></div>` +
+          (tags ? `<div class="ctags">${escapeHtml(tags)}</div>` : '') + `</div>`;
+      }).join('') || `<div class="hint" style="margin:0">drop students here</div>`;
       const over = g.students.length > g.capacity;
-      return `<div class="gcol${over ? ' over' : ''}"><div class="ghead">` +
+      return `<div class="gcol${over ? ' over' : ''}" data-gi="${gi}"><div class="ghead">` +
         `<div class="gid">${escapeHtml(g.GroupID)}</div>` +
         `<div class="gmeta">${escapeHtml(g.TimeSlot || '—')} · seats ${g.capacity}</div>` +
         `<div class="gtutors">${escapeHtml(tnames)}</div></div>` +
-        `<div class="gbody">${chips}</div><div class="gcount">${g.students.length} / ${g.capacity}</div></div>`;
+        `<div class="gbody" data-gi="${gi}">${chips}</div><div class="gcount">${g.students.length} / ${g.capacity}</div></div>`;
     }).join('');
   }
+
+  // Manual board edits operate on lastResult.groups, then re-render (which re-validates live).
+  function moveStudent(sid, toGi) {
+    if (!lastResult) return;
+    for (const g of lastResult.groups) { const k = g.students.indexOf(sid); if (k >= 0) g.students.splice(k, 1); }
+    lastResult.groups[toGi].students.push(sid);
+    renderResult(lastResult);
+  }
+  function toggleLock(sid) { if (locked.has(sid)) locked.delete(sid); else locked.add(sid); renderResult(lastResult); }
 
   // ---- Workbook build / export -------------------------------------------
   function buildWorkbook(data) {
@@ -1139,7 +1212,8 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     renderSheet();
     renderSolverControls();
     resetHistory();
-    $('scorecard').innerHTML = ''; $('board').innerHTML = ''; lastResult = null;
+    $('scorecard').innerHTML = ''; $('board').innerHTML = ''; lastResult = null; locked = new Set();
+    $('boardActions').classList.add('hidden');
     $('btnExport').disabled = false;
     if (label) $('loadedName').textContent = label;
   }
@@ -1208,23 +1282,54 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redo(); }
   });
 
-  // ---- Solve -------------------------------------------------------------
-  $('btnSolve').onclick = () => {
+  // ---- Solve + interactive board -----------------------------------------
+  function runSolve(locks) {
     if (!workbook) return;
     const res = validate(workbook);
     if (res.errors.length) {
       $('scorecard').innerHTML = `<div class="issue err">Fix the ${res.errors.length} data error(s) above before solving.</div>`;
-      $('board').innerHTML = '';
+      $('board').innerHTML = ''; $('boardActions').classList.add('hidden');
       return;
     }
     try {
-      lastResult = solve(workbook, $('unitSel').value, getWeights());
+      lastResult = solve(workbook, $('unitSel').value, getWeights(), locks);
       renderResult(lastResult);
     } catch (err) {
       $('scorecard').innerHTML = `<div class="issue err">Solve failed: ${escapeHtml(err.message)}</div>`;
       console.error(err);
     }
+  }
+  $('btnSolve').onclick = () => { locked = new Set(); runSolve(); };   // fresh solve clears locks
+
+  // Re-solve while keeping locked students in their current group.
+  $('btnResolve').onclick = () => {
+    if (!lastResult) return;
+    const locks = new Map();
+    lastResult.groups.forEach(g => g.students.forEach(sid => { if (locked.has(sid)) locks.set(sid, g.GroupID); }));
+    runSolve(locks);
   };
+  $('btnUnlockAll').onclick = () => { if (lastResult) { locked = new Set(); renderResult(lastResult); } };
+
+  // Drag-and-drop + lock toggling on the board (delegated; survives re-renders).
+  const boardEl = $('board');
+  boardEl.addEventListener('dragstart', (e) => {
+    const chip = e.target.closest && e.target.closest('.chip');
+    if (chip) { e.dataTransfer.setData('text/plain', chip.dataset.sid); e.dataTransfer.effectAllowed = 'move'; chip.classList.add('dragging'); }
+  });
+  boardEl.addEventListener('dragend', (e) => { const c = e.target.closest && e.target.closest('.chip'); if (c) c.classList.remove('dragging'); });
+  boardEl.addEventListener('dragover', (e) => { const col = e.target.closest && e.target.closest('.gcol'); if (col) { e.preventDefault(); col.classList.add('dragover'); } });
+  boardEl.addEventListener('dragleave', (e) => { const col = e.target.closest && e.target.closest('.gcol'); if (col && !col.contains(e.relatedTarget)) col.classList.remove('dragover'); });
+  boardEl.addEventListener('drop', (e) => {
+    const col = e.target.closest && e.target.closest('.gcol');
+    if (!col || !lastResult) return;
+    e.preventDefault(); col.classList.remove('dragover');
+    const sid = e.dataTransfer.getData('text/plain');
+    if (sid) moveStudent(sid, +col.dataset.gi);
+  });
+  boardEl.addEventListener('click', (e) => {
+    const lb = e.target.closest && e.target.closest('.lockbtn');
+    if (lb) { e.stopPropagation(); toggleLock(lb.dataset.sid); }
+  });
 
   $('btnExport').onclick = () => {
     if (!workbook) return;

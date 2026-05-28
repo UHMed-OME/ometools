@@ -129,4 +129,15 @@ assert.equal(exSol.violations.length, 0, '80-student example solves with 0 relax
 assert.ok(exSol.scorecard.hard.every(h => h.ok), 'example scorecard reports all hard constraints satisfied');
 console.log(`✓ 80-student example placed all ${exPlaced}, 0 violations across ${exSol.groups.length} groups`);
 
+// --- Test 7: locks pin a student to a group across a (re-)solve ------------
+const lockEx = app.makeExample();
+const locks = new Map([['S10', 'G3'], ['S20', 'G7']]);
+const lockedSol = app.solve(lockEx, 'MD2', app.defaultWeights(), locks);
+const groupIdOf = id => (lockedSol.groups.find(g => g.students.includes(id)) || {}).GroupID;
+assert.equal(groupIdOf('S10'), 'G3', 'locked student S10 stays in G3');
+assert.equal(groupIdOf('S20'), 'G7', 'locked student S20 stays in G7');
+const lockedPlaced = lockedSol.groups.reduce((n, g) => n + g.students.length, 0);
+assert.equal(lockedPlaced, 80, 'all students still placed with locks applied');
+console.log('✓ locked students are pinned to their groups across a re-solve');
+
 console.log('\nALL TESTS PASSED');
