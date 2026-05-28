@@ -668,6 +668,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     history.push(snapshot());
     if (history.length > HISTORY_MAX) history.shift();
     histPtr = history.length - 1;
+    dirty = true;
     updateUndoButtons();
   }
   function restoreState(state) {
@@ -1326,6 +1327,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   }
   let lastResult = null;
   let locked = new Set();      // studentIds pinned in place across a re-solve
+  let dirty = false;           // unsaved edits / an unexported solve since the last load or export
 
   // ---- Solver UI ---------------------------------------------------------
   function renderSolverControls() {
@@ -1445,6 +1447,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     if (!lastResult) return;
     for (const g of lastResult.groups) { const k = g.students.indexOf(sid); if (k >= 0) g.students.splice(k, 1); }
     lastResult.groups[toGi].students.push(sid);
+    dirty = true;
     renderResult(lastResult);
   }
   function toggleLock(sid) { if (locked.has(sid)) locked.delete(sid); else locked.add(sid); renderResult(lastResult); }
@@ -1555,6 +1558,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     $('boardActions').classList.add('hidden');
     $('btnExport').disabled = false;
     if (label) $('loadedName').textContent = label;
+    dirty = false;        // freshly loaded data matches its source
     showView('roster');   // loading data brings you to the Roster view
   }
 
@@ -1586,6 +1590,11 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     _modalReturnFocus = null;
     const r = _modalResolve; _modalResolve = null;
     if (r) r(result);
+  }
+
+  // Guard before an action that replaces the current workbook.
+  function confirmReplace() {
+    return dirty ? confirmDialog('Replace the current data? Unsaved changes will be lost.', 'Replace') : Promise.resolve(true);
   }
 
   // Transient toast for completed actions (Solve / Export / Print).
@@ -1628,17 +1637,18 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   });
 
   // Prefill the editor with the ~80-student demo cohort (freshly generated each time).
-  $('btnExample').onclick = () => {
-    loadWorkbook(makeExample(), 'Example data (80 students) — edit freely');
+  $('btnExample').onclick = async () => {
+    if (await confirmReplace()) loadWorkbook(makeExample(), 'Example data (80 students) — edit freely');
   };
 
   $('btnTemplate').onclick = () => {
     download(buildWorkbook(TEMPLATE), 'PBL_template.xlsx');
   };
 
-  $('fileInput').onchange = (e) => {
+  $('fileInput').onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (!(await confirmReplace())) { e.target.value = ''; return; }
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
@@ -1662,10 +1672,11 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     if (!p.classList.contains('hidden')) $('pasteText').focus();
   };
   $('btnPasteCancel').onclick = () => { $('pastePanel').classList.add('hidden'); };
-  $('btnPasteLoad').onclick = () => {
+  $('btnPasteLoad').onclick = async () => {
     try {
       const { rows, match } = parsePasted($('pasteText').value);
       if (!rows.length) { $('pasteMsg').textContent = 'No rows found — include a header row.'; return; }
+      if (!(await confirmReplace())) return;
       const wb = workbook || {};
       wb[match] = rows;                       // replace the matched sheet (other sheets kept)
       $('pasteText').value = '';
@@ -1707,6 +1718,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
       const cohort = $('cohortField').hidden ? '' : $('cohortSel').value;
       lastResult = solve(workbook, $('unitSel').value, getWeights(), locks, cohort);
       renderResult(lastResult);
+      if (!lastResult.error) dirty = true;   // a solved board is unsaved work until exported
     } catch (err) {
       $('scorecard').innerHTML = `<div class="issue err">Solve failed: ${escapeHtml(err.message)}</div>`;
       console.error(err);
@@ -1754,9 +1766,15 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     const solved = lastResult && !lastResult.error;
     const name = solved ? `PBL_${lastResult.unit}_results.xlsx` : 'PBL_export.xlsx';
     download(exportWorkbook(), name);
+    dirty = false;        // saved to disk
     toast(solved ? `Exported ${name} (with results + history)` : `Exported ${name}`);
   };
   $('btnPrint').onclick = printRoster;
+
+  // Warn before leaving with unsaved edits / an unexported solve. (Guarded for the
+  // headless test, which has no window.)
+  if (typeof window !== 'undefined' && window.addEventListener)
+    window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
 
   // Start with example data loaded so the operator sees a working editor + board
   // immediately. Gated on a real DOM (skipped under the headless test harness).
