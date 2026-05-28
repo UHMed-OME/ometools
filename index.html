@@ -100,10 +100,7 @@
     button:disabled { opacity: 0.45; cursor: not-allowed; }
     .filebtn { display: inline-flex; align-items: center; gap: 0.4rem; }
     input[type=file] { display: none; }
-    .note {
-      border-left: 4px solid var(--accent); background: var(--accent-bg);
-      padding: 0.7rem 1rem; border-radius: 6px; margin: 0 0 1.25rem; font-size: 0.95rem;
-    }
+    .footnote { color: var(--muted); font-size: 0.8rem; text-align: center; margin: 2.5rem 0 0; }
     #validation { margin: 1.1rem 0; }
     .vsummary { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.6rem; font-weight: 600; }
     .pill { padding: 0.3rem 0.7rem; border-radius: 999px; font-size: 0.9rem; font-weight: 600; }
@@ -211,7 +208,6 @@
     .wrow input[type=range] { width: 100%; height: 6px; accent-color: var(--accent); }
     #scorecard { margin: 1.2rem 0; }
     .sc-hard { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-bottom: 0.7rem; }
-    .issue.ok-note { background: var(--accent-bg); border-left: 3px solid var(--ok); margin-top: 0.6rem; }
     .issue.err, .issue.warn { margin-top: 0.6rem; }
     /* Soft-metric status cards */
     .sc-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.7rem; }
@@ -343,11 +339,6 @@
   </nav>
 
   <main>
-    <p class="note">
-      <strong>Offline &amp; FERPA-safe.</strong> Everything runs in this browser tab — your workbook is
-      read locally and written back to Downloads. No data is uploaded.
-    </p>
-
     <section id="view-roster" class="view" role="tabpanel">
       <div id="pastePanel" class="hidden">
         <p class="hint">Copy rows from Excel or Google Sheets (include the header row) and paste below.
@@ -383,7 +374,6 @@
 
     <section id="view-groups" class="view" role="tabpanel" hidden>
       <div id="solver">
-        <p class="section-sub">Pick the unit and Solve. Then drag students between groups to adjust — a red chip breaks a hard rule. Lock anyone and re-solve.</p>
         <div class="solvebar">
           <label id="cohortField" hidden>Class&nbsp; <select id="cohortSel"></select></label>
           <label>Unit&nbsp; <select id="unitSel"></select></label>
@@ -395,7 +385,7 @@
         </div>
         <div id="scorecard" aria-live="polite"></div>
         <div id="boardActions" class="board-actions hidden">
-          <span class="hint" style="margin:0">Drag a student between groups to adjust. A red chip breaks a hard rule (hover for why). Lock 🔒 anyone to keep on re-solve.</span>
+          <span class="hint" style="margin:0">Drag students to adjust; lock to keep on re-solve.</span>
           <button id="btnResolve"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v5h-5"/></svg> Re-solve (keep locked)</button>
           <button id="btnUnlockAll">Unlock all</button>
           <button id="btnPrint"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="4" y="9" width="16" height="8" rx="2"/><rect x="7" y="14" width="10" height="6" rx="1"/></svg> Print / Save PDF roster</button>
@@ -403,6 +393,8 @@
         <div id="board"></div>
       </div>
     </section>
+
+    <p class="footnote">Runs entirely in your browser — no data leaves your computer.</p>
   </main>
 
   <!-- Printable roster: hidden on screen, shown only when printing (Save as PDF). -->
@@ -432,18 +424,21 @@
 
   // ---- Schema: the data contract (spec §2) -------------------------------
   // Each sheet lists required columns; validation keys off these.
+  // `required` = the full canonical column set (written on export, shown in the editor).
+  // `essential` = the only columns that ERROR if absent / blank; everything else is optional
+  // and merely improves the solve (blanks mean "no constraint/preference there").
   const SCHEMA = {
-    Students: { key: 'StudentID',
+    Students: { key: 'StudentID', essential: ['StudentID'],
       required: ['StudentID', 'Name', 'Gender', 'Imi', 'Resident', 'LCMentorID', 'ScheduleTag', 'Cohort'] },
-    Tutors:   { key: 'TutorID',
+    Tutors:   { key: 'TutorID', essential: ['TutorID'],
       required: ['TutorID', 'Name', 'Availability', 'MaxStudents', 'CoTutorOK'] },
-    Conflicts:{ key: null,
+    Conflicts:{ key: null, essential: ['TypeA_ID', 'TypeB_ID', 'Kind'],
       required: ['TypeA_ID', 'TypeB_ID', 'Kind', 'Reason'] },
-    Groups:   { key: null,
+    Groups:   { key: null, essential: ['Unit', 'GroupID'],
       required: ['Unit', 'GroupID', 'TimeSlot', 'TutorIDs', 'Cohort'] },
     // NOTE: Excel reserves the worksheet name "History" (change-tracking),
     // so the spec's "History" sheet is stored as "PBLHistory" — same columns.
-    PBLHistory: { key: null,
+    PBLHistory: { key: null, essential: [],
       required: ['Unit', 'StudentID', 'GroupID', 'TutorID'] },
   };
   const SHEET_ORDER = ['Students', 'Tutors', 'Conflicts', 'Groups', 'PBLHistory'];
@@ -735,7 +730,7 @@
       }
       if (rows.length) {
         const have = new Set(Object.keys(rows[0]));
-        for (const col of SCHEMA[name].required) {
+        for (const col of (SCHEMA[name].essential || [])) {   // only essential columns must exist
           if (!have.has(col)) err(`${name}`, `missing required column "${col}"`);
         }
       }
@@ -836,14 +831,14 @@
     lastValidation = res;
     const counts = SHEET_ORDER.map(n => ({ n, c: (workbook[n] || []).length })).filter(x => x.c);
     const nE = res.errors.length, nW = res.warnings.length;
-    const status = nE
-      ? `<span class="pill err">${nE} to fix</span>`
-      : (nW ? `<span class="pill warn">${nW} warning${nW > 1 ? 's' : ''}</span>` : `<span class="pill ok">✓ No problems</span>`);
+    // Assume good: only show a pill when something needs attention.
+    const status = nE ? `<span class="pill err">${nE} to fix</span>`
+      : (nW ? `<span class="pill warn">${nW} warning${nW > 1 ? 's' : ''}</span>` : '');
     const countStr = counts.length
       ? counts.map(x => `<span class="sc-n"><b>${x.c}</b> ${escapeHtml(sheetLabel(x.n).toLowerCase())}</span>`).join(' · ')
       : 'No data yet';
     $('dataSummary').innerHTML =
-      `<div class="summary-line">${countStr} &nbsp; ${status}</div>` +
+      `<div class="summary-line">${countStr}${status ? ' &nbsp; ' + status : ''}</div>` +
       `<button id="btnEditData" class="ghost" aria-expanded="${editorOpen}">${editorOpen ? 'Hide data ▴' : 'Edit data ▾'}</button>`;
     $('dataSummary').classList.remove('hidden');
     $('editorWrap').classList.toggle('hidden', !editorOpen);
@@ -851,13 +846,12 @@
   }
 
   function renderValidation(res) {
-    const v = $('validation'); v.classList.remove('hidden');
+    const v = $('validation');
     const nE = res.errors.length, nW = res.warnings.length;
-    $('vsummary').innerHTML =
-      (nE === 0
-        ? `<span class="pill ok">✓ No blocking errors</span>`
-        : `<span class="pill err">${nE} error${nE>1?'s':''}</span>`) +
-      (nW ? `<span class="pill warn">${nW} warning${nW>1?'s':''}</span>` : '');
+    // Quiet on success: only show the validation block when there's something to fix.
+    if (nE + nW === 0) { v.classList.add('hidden'); $('vsummary').innerHTML = ''; $('issues').innerHTML = ''; return; }
+    v.classList.remove('hidden');
+    $('vsummary').innerHTML = '';   // status lives on the summary card — no duplicate banner
     const row = (cls, x) => {
       const loc = (x.sheet)
         ? `<button class="loc loclink" data-sheet="${escapeAttr(x.sheet)}" data-ri="${x.ri}">${escapeHtml(x.loc)}</button>: `
@@ -949,7 +943,7 @@
                            : `${rows.length} row${rows.length === 1 ? '' : 's'}`;
     view.innerHTML =
       `<div class="sheet-tools"><button id="btnAddRow">+ Add row</button>` +
-      `<span class="hint" style="margin:0">${shown} — edit cells directly, toggle Y/N, or paste rows via “Paste rows”.</span></div>` +
+      `<span class="hint" style="margin:0">${shown}</span></div>` +
       (cols.length
         ? `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`
         : `<div class="empty">${sheet} is empty.</div>`);
@@ -1365,7 +1359,6 @@
     const assignArr = res.groups.map(g => g.students);
     const hardChecks = verifyHard(res.groups, idx);
     const m = metricsOf(assignArr, res.groups, idx);
-    const penalty = penaltyOf(m, getWeights());
 
     const hard = hardChecks.map(h =>
       `<span class="pill ${h.ok ? 'ok' : 'err'}">${h.ok ? '✓' : '✗'} ${escapeHtml(h.rule)}${h.ok ? '' : ` (${h.violations})`}</span>`).join('');
@@ -1375,22 +1368,20 @@
       card('Imi Hoʻōla doubled up', m.imiOver, m.imiOver === 0) +
       card('Non-residents over share', m.nonResSpread, m.nonResSpread === 0) +
       card('Gender imbalance', m.genderImb, m.genderImb <= 1) +
-      card('Repeat groupmate pairs', m.repeatPairs, m.repeatPairs === 0) +
-      card('Total penalty', penalty, penalty === 0);
+      card('Repeat groupmate pairs', m.repeatPairs, m.repeatPairs === 0);
     const flagList = [...flags.entries()], warnList = [...warns.entries()];
-    const conflictRows = (workbook.Conflicts || []).filter(r => norm(r.TypeA_ID) && norm(r.TypeB_ID)).length;
+    // Quiet on success: the green hard-rule pills already signal "all good" — only add
+    // a message block when there's a hard-rule break, a conflict, or a capacity shortfall.
     sc.innerHTML =
       `<div class="sc-hard">${hard}</div><div class="sc-cards">${cards}</div>` +
       (flagList.length
         ? `<div class="issue err"><b>${flagList.length} student(s) break a hard rule:</b> ` +
           flagList.map(([sid, v]) => `${escapeHtml(nameOf(sid))} — ${escapeHtml(v.rule)} (${escapeHtml(v.detail)})`).join('; ') +
-          `. Move them, or fix the input and re-solve.</div>`
-        : `<div class="issue ok-note">✓ All hard rules satisfied.</div>`) +
+          `. Move them, or fix the input and re-solve.</div>` : '') +
       (warnList.length
         ? `<div class="issue warn"><b>${warnList.length} conflict warning(s):</b> ` +
           warnList.map(([sid, v]) => `${escapeHtml(nameOf(sid))} ${escapeHtml(v.detail || v.rule)}`).join('; ') +
-          `. Conflicts are advisory — separate them if you can.</div>`
-        : (conflictRows ? `<div class="issue ok-note">✓ All ${conflictRows} conflict rule(s) respected.</div>` : '')) +
+          `. Conflicts are advisory — separate them if you can.</div>` : '') +
       (res.capacityShortfall
         ? `<div class="issue warn">${res.capacityShortfall} more student(s) than total seats — add a group or raise a tutor's Max Students.</div>` : '');
 
@@ -1679,18 +1670,17 @@
     if (!workbook) return;
     const res = validate(workbook);
     if (res.errors.length) {
-      $('scorecard').innerHTML = `<div class="issue err">Fix the ${res.errors.length} data error(s) above before solving.</div>`;
+      const first = res.errors[0];
+      $('scorecard').innerHTML = `<div class="issue err">Fix ${res.errors.length} data problem(s) first. ` +
+        `<button class="loclink" id="goFix">Go to Roster</button></div>`;
       $('board').innerHTML = ''; $('boardActions').classList.add('hidden');
+      $('goFix').onclick = () => first && first.sheet ? jumpToError(first.sheet, first.ri) : showView('roster');
       return;
     }
     try {
       const cohort = $('cohortField').hidden ? '' : $('cohortSel').value;
       lastResult = solve(workbook, $('unitSel').value, getWeights(), locks, cohort);
       renderResult(lastResult);
-      if (!lastResult.error) {
-        const placed = lastResult.groups.reduce((n, g) => n + g.students.length, 0);
-        toast(`Solved ${lastResult.unit}${cohort ? ' · ' + cohort : ''} — ${placed} students placed`);
-      }
     } catch (err) {
       $('scorecard').innerHTML = `<div class="issue err">Solve failed: ${escapeHtml(err.message)}</div>`;
       console.error(err);
