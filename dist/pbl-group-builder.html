@@ -386,6 +386,7 @@
         <div id="scorecard" aria-live="polite"></div>
         <div id="boardActions" class="board-actions hidden">
           <span class="hint" style="margin:0">Drag students to adjust; lock to keep on re-solve.</span>
+          <button id="btnResetBoard">↺ Reset board</button>
           <button id="btnResolve"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v5h-5"/></svg> Re-solve (keep locked)</button>
           <button id="btnUnlockAll">Unlock all</button>
           <button id="btnPrint"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="4" y="9" width="16" height="8" rx="2"/><rect x="7" y="14" width="10" height="6" rx="1"/></svg> Print / Save PDF roster</button>
@@ -1328,6 +1329,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   let lastResult = null;
   let locked = new Set();      // studentIds pinned in place across a re-solve
   let dirty = false;           // unsaved edits / an unexported solve since the last load or export
+  let solvedGroups = null;     // snapshot of the last solved arrangement, for "Reset board"
 
   // ---- Solver UI ---------------------------------------------------------
   function renderSolverControls() {
@@ -1717,8 +1719,11 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     try {
       const cohort = $('cohortField').hidden ? '' : $('cohortSel').value;
       lastResult = solve(workbook, $('unitSel').value, getWeights(), locks, cohort);
+      if (!lastResult.error) {
+        solvedGroups = JSON.parse(JSON.stringify(lastResult.groups));   // snapshot for "Reset board"
+        dirty = true;   // a solved board is unsaved work until exported
+      }
       renderResult(lastResult);
-      if (!lastResult.error) dirty = true;   // a solved board is unsaved work until exported
     } catch (err) {
       $('scorecard').innerHTML = `<div class="issue err">Solve failed: ${escapeHtml(err.message)}</div>`;
       console.error(err);
@@ -1734,6 +1739,11 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     runSolve(locks);
   };
   $('btnUnlockAll').onclick = () => { if (lastResult) { locked = new Set(); renderResult(lastResult); } };
+
+  // Reset the board to the last solved arrangement (undoes manual drags/moves).
+  $('btnResetBoard').onclick = () => {
+    if (lastResult && solvedGroups) { lastResult.groups = JSON.parse(JSON.stringify(solvedGroups)); renderResult(lastResult); }
+  };
 
   // Drag-and-drop + lock toggling on the board (delegated; survives re-renders).
   const boardEl = $('board');
