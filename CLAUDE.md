@@ -4,7 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-**Phase 1 (data + validation + FERPA-safe round-trip) is implemented**, plus three additions: (a) **paste import** — `parsePasted()` ingests tab-delimited rows from Excel/Google Sheets (or CSV text), matching the target sheet by headers like the `.csv` path; (b) a **simple inline editor** — the sheet view renders editable text cells, Y/N **toggle switches** for `BOOL_COLS` (`Imi`/`Resident`/`CoTutorOK`), and add/delete-row, writing straight back into the in-memory `workbook` and re-validating live; (c) a **JABSOM/UH Mānoa theme** (deep-green `--brand` masthead, green accents, gold trim). `PBL_Group_Builder_Spec.md` remains the authoritative source for all architecture and behavior; read it before building further, and treat its open questions (spec §7) as things to confirm with the operator rather than guess. The full solver (Phase 2), drag-drop board + soft-weight sliders (Phase 3), and export polish/PDF (Phase 4) are not built yet.
+**Phase 1 (data + validation + FERPA-safe round-trip) is implemented**, plus several UX additions on top:
+- **Paste import** — `parsePasted()` ingests tab-delimited rows from Excel/Google Sheets (or CSV text), matching the target sheet by headers like the `.csv` path; pasting into an already-loaded workbook replaces just that one sheet.
+- **Inline editor** — the sheet view renders editable text cells, Y/N **toggle switches** for `BOOL_COLS` (`Imi`/`Resident`/`CoTutorOK`), a **`ScheduleTag` dropdown** (`SCHEDULE_TAGS` presets — `ImiGA`, `HOMEmgr`, `Exception:Day-Slot` — with a `Custom…` option that swaps the cell to a text box), and add/delete-row. Edits write straight back into the in-memory `workbook` and re-validate live.
+- **Load example data** button — prefills the editor with a deep clone of `TEMPLATE` so the operator can start from filled-in sample rows.
+- **Theme** — **light mode only** (no `prefers-color-scheme` dark switch, by request): a slim green masthead band (`--brand` → `--brand-dark` gradient) with a gold trim rule and an **inline-SVG logo placeholder** in the header. The real JABSOM logo could not be fetched (the `jabsom.hawaii.edu` host is unreachable/UH-network-restricted); swap the placeholder `<svg>` for the official mark as **inline SVG or a `data:` URI** — never a remote URL (FERPA/offline).
+
+`PBL_Group_Builder_Spec.md` remains the authoritative source for all architecture and behavior; read it before building further, and treat its open questions (spec §7) as things to confirm with the operator rather than guess. The full solver (Phase 2), drag-drop board + soft-weight sliders (Phase 3), and export polish/PDF (Phase 4) are not built yet.
 
 ## Layout
 

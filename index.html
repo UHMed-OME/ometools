@@ -6,30 +6,34 @@
   <meta name="robots" content="noindex">
   <title>PBL Group Builder</title>
   <style>
+    /* Light theme only (no dark-mode switch — see spec/CLAUDE.md). */
     :root {
-      /* JABSOM / UH Mānoa palette: deep green masthead, green accents, warm-gold trim. */
-      --bg: #ffffff; --fg: #1a1a1a; --muted: #5f6b66; --line: #dfe5e2;
-      --brand: #024731; --brand-fg: #ffffff;          /* deep JABSOM green */
+      /* JABSOM / UH Mānoa palette: green masthead band, green accents, warm-gold trim. */
+      --bg: #ffffff; --surface: #f6f8f7; --fg: #1a2420; --muted: #5f6b66; --line: #dfe5e2;
+      --brand: #0a7d4f; --brand-dark: #024731; --brand-fg: #ffffff;  /* slim green band */
       --accent: #00734a; --accent-bg: rgba(0,115,74,0.08);
       --gold: #f0b323;                                 /* UH Mānoa warm accent */
       --err: #c0392b; --err-bg: rgba(192,57,43,0.08);
       --warn: #b8860b; --warn-bg: rgba(184,134,11,0.10);
       --ok: #00734a;
     }
-    @media (prefers-color-scheme: dark) {
-      :root { --bg:#1b1d1e; --fg:#e8e8e8; --muted:#9aa0a6; --line:#34383b;
-              --brand:#013525; --accent:#2ecc8f; --accent-bg:rgba(46,204,143,0.14);
-              --err-bg:rgba(231,76,60,0.14); --warn-bg:rgba(241,196,15,0.14); }
-    }
     * { box-sizing: border-box; }
     body {
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       color: var(--fg); background: var(--bg); margin: 0; line-height: 1.5;
     }
-    header { padding: 1.1rem 1.5rem; background: var(--brand); color: var(--brand-fg);
-             border-bottom: 4px solid var(--gold); }
-    h1 { margin: 0; font-size: 1.4rem; letter-spacing: 0.01em; }
-    header .tag { color: rgba(255,255,255,0.82); }
+    /* Slim green masthead band with a gold trim rule. */
+    header {
+      padding: 0.85rem 1.5rem;
+      background: linear-gradient(180deg, var(--brand) 0%, var(--brand-dark) 100%);
+      color: var(--brand-fg); border-bottom: 3px solid var(--gold);
+      display: flex; align-items: center; gap: 0.85rem;
+    }
+    .logo { flex: 0 0 auto; height: 38px; width: 38px; }
+    .logo svg { height: 100%; width: 100%; display: block; }
+    .masthead { min-width: 0; }
+    h1 { margin: 0; font-size: 1.3rem; letter-spacing: 0.01em; font-weight: 650; }
+    header .tag { color: rgba(255,255,255,0.85); }
     .tag { color: var(--muted); margin: 0.15rem 0 0; font-size: 0.9rem; }
     main { padding: 1rem 1.5rem 4rem; max-width: 1200px; }
     .toolbar {
@@ -96,6 +100,11 @@
       background: transparent; color: var(--fg); padding: 0.35rem 0.6rem;
     }
     input.cell:focus { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-bg); }
+    select.cell {
+      width: 100%; min-width: 8rem; font: inherit; font-size: 0.85rem; border: 0;
+      background: transparent; color: var(--fg); padding: 0.32rem 0.5rem; cursor: pointer;
+    }
+    select.cell:focus { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-bg); }
     /* Y/N toggle switch */
     .tog { position: relative; display: inline-block; width: 38px; height: 20px; vertical-align: middle; }
     .tog input { opacity: 0; width: 0; height: 0; }
@@ -113,8 +122,21 @@
 </head>
 <body>
   <header>
-    <h1>PBL Group Builder</h1>
-    <p class="tag">JABSOM Problem-Based Learning group assignment &mdash; MD1&ndash;MD7</p>
+    <!-- LOGO: inline SVG placeholder (kept inline so the file stays offline / FERPA-safe).
+         To use the real JABSOM logo, replace the <svg> below with the official mark
+         (inline SVG, or <img src="data:image/png;base64,...">). Do NOT link to a remote URL. -->
+    <span class="logo" aria-hidden="true">
+      <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="24" cy="24" r="23" fill="#ffffff" opacity="0.12"/>
+        <circle cx="24" cy="24" r="23" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.55"/>
+        <path d="M24 9c-4 6-9 8-9 15a9 9 0 0 0 18 0c0-7-5-9-9-15z" fill="#ffffff"/>
+        <path d="M24 14c-2.5 4-5.5 5.5-5.5 10a5.5 5.5 0 0 0 5.5 5.5z" fill="var(--gold)"/>
+      </svg>
+    </span>
+    <div class="masthead">
+      <h1>PBL Group Builder</h1>
+      <p class="tag">JABSOM Problem-Based Learning group assignment &mdash; MD1&ndash;MD7</p>
+    </div>
   </header>
   <main>
     <div class="note">
@@ -123,6 +145,7 @@
     </div>
 
     <div class="toolbar">
+      <button id="btnExample">✨ Load example data</button>
       <button id="btnTemplate">⬇ Download blank template</button>
       <label class="filebtn">
         📂 Load workbook (.xlsx / .csv)
@@ -153,7 +176,8 @@
     <div id="sheetView" class="sheet-wrap hidden"></div>
 
     <div id="placeholder" class="empty">
-      Load a workbook to begin, or download the blank template to see the expected format.
+      Load a workbook or paste rows to begin — or click <strong>Load example data</strong> to
+      start from filled-in sample rows you can edit.
     </div>
   </main>
 
@@ -185,6 +209,15 @@
   const YN = new Set(['Y', 'N', '']);
   // Columns rendered as a Y/N toggle in the inline editor.
   const BOOL_COLS = new Set(['Imi', 'Resident', 'CoTutorOK']);
+
+  // ScheduleTag preset menu (spec §2: ImiGA, HOMEmgr, Exception:Day-Slot, or blank).
+  // Rendered as a dropdown in the editor instead of free text; "Custom…" falls back
+  // to a text box for anything not in this list.
+  const SCHED_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  const SCHED_SLOTS = ['AM', 'PM'];
+  const SCHEDULE_TAGS = ['', 'ImiGA', 'HOMEmgr',
+    ...SCHED_DAYS.flatMap(d => SCHED_SLOTS.map(s => `Exception:${d}-${s}`))];
+  const CUSTOM_TAG = '__custom__';
 
   // Template example rows — illustrate format; IDs are obviously fake.
   const TEMPLATE = {
@@ -405,12 +438,24 @@
     const cols = SCHEMA[sheet] ? SCHEMA[sheet].required : (rows[0] ? Object.keys(rows[0]) : []);
     const bad = badRows[sheet] || new Set();
 
+    const textCell = (i, c, v) =>
+      `<td class="cell-edit"><input class="cell" type="text" data-r="${i}" data-c="${c}" value="${escapeAttr(v)}"></td>`;
+
     const cell = (r, i, c) => {
+      const v = norm(r[c]);
       if (BOOL_COLS.has(c)) {
         const on = up(r[c]) === 'Y';
         return `<td class="cell-edit"><label class="tog"><input type="checkbox" data-r="${i}" data-c="${c}" data-bool="1"${on ? ' checked' : ''}><span class="track"></span></label></td>`;
       }
-      return `<td class="cell-edit"><input class="cell" type="text" data-r="${i}" data-c="${c}" value="${escapeAttr(norm(r[c]))}"></td>`;
+      if (c === 'ScheduleTag') {
+        // A value not in the preset list is a custom one — show it as a text box.
+        if (v && !SCHEDULE_TAGS.includes(v)) return textCell(i, c, v);
+        const opts = SCHEDULE_TAGS.map(t =>
+          `<option value="${escapeAttr(t)}"${t === v ? ' selected' : ''}>${t === '' ? '— none —' : escapeHtml(t)}</option>`).join('') +
+          `<option value="${CUSTOM_TAG}">Custom…</option>`;
+        return `<td class="cell-edit"><select class="cell tagsel" data-r="${i}" data-c="${c}">${opts}</select></td>`;
+      }
+      return textCell(i, c, v);
     };
     const head = cols.map(c => `<th>${escapeHtml(c)}</th>`).join('') + `<th class="actions-col"></th>`;
     const body = rows.map((r, i) =>
@@ -433,6 +478,18 @@
       const t = e.target;
       if (t.dataset && t.dataset.bool) {
         workbook[sheet][+t.dataset.r][t.dataset.c] = t.checked ? 'Y' : 'N';
+        refreshValidation();
+      } else if (t.classList && t.classList.contains('tagsel')) {
+        const r = +t.dataset.r, c = t.dataset.c;
+        if (t.value === CUSTOM_TAG) {
+          // Swap this cell to a free-text box for an off-menu value.
+          workbook[sheet][r][c] = '';
+          const td = t.closest('td');
+          td.innerHTML = `<input class="cell" type="text" data-r="${r}" data-c="${c}" value="" placeholder="custom tag…">`;
+          td.querySelector('input').focus();
+        } else {
+          workbook[sheet][r][c] = t.value;
+        }
         refreshValidation();
       } else if (t.classList && t.classList.contains('cell')) {
         refreshValidation();   // re-validate when a text edit is committed (blur/Enter)
@@ -503,6 +560,11 @@
   }
 
   // ---- Wiring ------------------------------------------------------------
+  // Prefill the editor with example rows (deep-cloned so edits don't mutate TEMPLATE).
+  $('btnExample').onclick = () => {
+    loadWorkbook(JSON.parse(JSON.stringify(TEMPLATE)), 'Example data — edit freely');
+  };
+
   $('btnTemplate').onclick = () => {
     download(buildWorkbook(TEMPLATE), 'PBL_template.xlsx');
   };
