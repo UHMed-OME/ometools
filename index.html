@@ -198,24 +198,32 @@
     .wrow input[type=range] { width: 100%; height: 6px; accent-color: var(--accent); }
     #scorecard { margin: 1.2rem 0; }
     .sc-hard { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-bottom: 0.7rem; }
-    .sc-soft { display: flex; flex-wrap: wrap; gap: 0.6rem 1.4rem; font-size: 0.95rem;
-      padding: 0.7rem 0.9rem; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
-    .sc-soft span { color: var(--muted); } .sc-soft b { color: var(--fg); font-variant-numeric: tabular-nums; }
+    .issue.ok-note { background: var(--accent-bg); border-left: 3px solid var(--ok); margin-top: 0.6rem; }
+    .issue.err, .issue.warn { margin-top: 0.6rem; }
+    /* Soft-metric status cards */
+    .sc-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.7rem; }
+    .sc-card { border: 1px solid var(--line); border-radius: var(--radius-card); padding: 0.7rem 0.85rem;
+      background: var(--surface); }
+    .sc-card.good { border-color: rgba(0,115,74,0.4); background: var(--accent-bg); }
+    .sc-val { font-size: 1.5rem; font-weight: 700; line-height: 1; color: var(--fg); font-variant-numeric: tabular-nums; }
+    .sc-card.good .sc-val { color: var(--ok); }
+    .sc-lab { font-size: 0.82rem; color: var(--muted); margin-top: 0.25rem; }
     .board { display: flex; gap: 0.9rem; overflow-x: auto; padding-bottom: 0.7rem; align-items: flex-start; }
-    .gcol { flex: 0 0 230px; border: 1px solid var(--line); border-radius: 10px;
-      background: var(--bg); display: flex; flex-direction: column; overflow: hidden;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .gcol.over { border-color: var(--err); }
+    .gcol { flex: 0 0 230px; border: 1px solid var(--line); border-top: 3px solid var(--brand); border-radius: 10px;
+      background: var(--bg); display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--e1); }
+    .gcol.over { border-color: var(--err); border-top-color: var(--err); }
     .ghead { padding: 0.7rem 0.8rem; border-bottom: 1px solid var(--line); background: var(--surface); }
     .ghead .gid { font-weight: 700; font-size: 1rem; color: var(--brand-dark); }
     .ghead .gmeta { font-size: 0.82rem; color: var(--muted); }
     .ghead .gtutors { font-size: 0.88rem; color: var(--accent); font-weight: 600; margin-top: 0.15rem; }
     .gbody { padding: 0.55rem; display: flex; flex-direction: column; gap: 0.4rem; min-height: 48px; }
     .chip { padding: 0.45rem 0.6rem; border-radius: 7px; background: var(--surface);
-      border: 1px solid var(--line); font-size: 0.9rem; cursor: grab; }
+      border: 1px solid var(--line); font-size: 0.9rem; cursor: grab; transition: box-shadow var(--motion), border-color var(--motion); }
+    .chip:hover { border-color: var(--accent); box-shadow: var(--e1); }
     .chip:active { cursor: grabbing; }
     .chip.dragging { opacity: 0.5; }
     .chip.flag { border-color: var(--err); background: var(--err-bg); }
+    .chip.warn { border-color: var(--warn); background: var(--warn-bg); }
     .chip.locked { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
     .chip .chip-row { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
     .chip .cname { font-weight: 600; }
@@ -298,7 +306,7 @@
   </header>
 
   <nav class="apptabs" id="appTabs" role="tablist" aria-label="Views">
-    <button class="apptab active" data-view="roster" role="tab" aria-selected="true">Roster &amp; data</button>
+    <button class="apptab active" data-view="roster" role="tab" aria-selected="true">Roster</button>
     <button class="apptab" data-view="groups" role="tab" aria-selected="false">Groups</button>
     <span id="loadedName" class="tag"></span>
   </nav>
@@ -1167,17 +1175,17 @@
     return { assign: best, penalty: bestP };
   }
 
-  // Re-scan a finished assignment and tally any remaining hard-rule breaks per rule.
+  // Re-scan a finished assignment and tally remaining HARD-rule breaks per rule.
+  // Conflicts are intentionally excluded here — they're surfaced as advisory warnings
+  // in the UI (renderResult), not verified as hard pass/fail rules.
   function verifyHard(outGroups, idx) {
-    const tally = { 'Tutor–student conflict': 0, 'Student–student conflict': 0, 'No repeat tutor': 0, 'Schedule fit': 0, 'LC mentor ≠ tutor': 0 };
+    const tally = { 'No repeat tutor': 0, 'Schedule fit': 0, 'LC mentor ≠ tutor': 0 };
     outGroups.forEach(g => {
       const group = { GroupID: g.GroupID, TimeSlot: g.TimeSlot, tutors: g.tutors, capacity: g.capacity };
-      g.students.forEach((sid, i) => {
+      g.students.forEach(sid => {
         const s = idx.studentsById.get(sid); if (!s) return;
         const sv = staticViolation(s, group, idx);
         if (sv && tally[sv.rule] != null) tally[sv.rule]++;
-        for (let j = i + 1; j < g.students.length; j++)
-          if (idx.ssConf.has(pairKey(sid, g.students[j]))) tally['Student–student conflict']++;
       });
     });
     return Object.entries(tally).map(([rule, n]) => ({ rule, ok: n === 0, violations: n }));
@@ -1233,9 +1241,10 @@
     $('unitSel').innerHTML = units.length
       ? units.map(u => `<option value="${escapeAttr(u)}">${escapeHtml(u)}</option>`).join('')
       : `<option value="">(no rows in Groups sheet)</option>`;
-    // Cohort picker — only shown when more than one class is present.
+    // Class/cohort + unit are pulled from the loaded data (not hardcoded).
+    // Show the Class picker whenever any cohort is present so the operator sees which class.
     const cohorts = [...new Set((workbook.Students || []).map(s => norm(s.Cohort)).filter(Boolean))].sort();
-    $('cohortField').hidden = cohorts.length < 2;
+    $('cohortField').hidden = cohorts.length < 1;
     $('cohortSel').innerHTML = cohorts.map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join('');
     if (!$('weights').dataset.built) {
       $('weights').innerHTML = SOFT.map(s =>
@@ -1266,15 +1275,18 @@
     // Live re-validation against the current board state.
     const idx = buildIndex(workbook);
     idx.prior = priorData(idx.history, res.unit);
-    const flags = new Map();   // studentId -> { rule, detail }
+    // Hard-rule breaks (red) are verified; conflicts are advisory warnings (amber), not hard-verified.
+    const flags = new Map();   // studentId -> { rule, detail } — hard
+    const warns = new Map();   // studentId -> { rule, detail } — conflicts
     res.groups.forEach(g => {
       const group = { GroupID: g.GroupID, TimeSlot: g.TimeSlot, tutors: g.tutors, capacity: g.capacity };
       g.students.forEach((sid, i) => {
         const s = idx.studentsById.get(sid);
-        let v = s ? staticViolation(s, group, idx) : null;
-        if (!v) { const mm = memberConflict(sid, g.students.filter((_, k) => k !== i), idx);
-                  if (mm) v = { rule: 'Student–student conflict', detail: `with ${nameOf(mm)}` }; }
-        if (v) flags.set(sid, v);
+        const sv = s ? staticViolation(s, group, idx) : null;
+        const mc = memberConflict(sid, g.students.filter((_, k) => k !== i), idx);
+        if (sv && sv.rule === 'Tutor–student conflict') warns.set(sid, sv);
+        else if (sv) flags.set(sid, sv);
+        else if (mc) warns.set(sid, { rule: 'Student–student conflict', detail: `grouped with ${nameOf(mc)}` });
       });
     });
     const assignArr = res.groups.map(g => g.students);
@@ -1284,23 +1296,30 @@
 
     const hard = hardChecks.map(h =>
       `<span class="pill ${h.ok ? 'ok' : 'err'}">${h.ok ? '✓' : '✗'} ${escapeHtml(h.rule)}${h.ok ? '' : ` (${h.violations})`}</span>`).join('');
-    const soft = [
-      ['Imi Hoʻōla students doubled-up', m.imiOver],
-      ['Non-residents over even share', m.nonResSpread],
-      ['Gender imbalance', m.genderImb],
-      ['Repeat groupmate pairs', m.repeatPairs],
-      ['Total penalty', penalty],
-    ].map(([k, v]) => `<span>${escapeHtml(k)}: <b>${v}</b></span>`).join('');
-    const flagList = [...flags.entries()];
+    const card = (label, val, good) =>
+      `<div class="sc-card${good ? ' good' : ''}"><div class="sc-val">${val}</div><div class="sc-lab">${escapeHtml(label)}</div></div>`;
+    const cards =
+      card('Imi Hoʻōla doubled up', m.imiOver, m.imiOver === 0) +
+      card('Non-residents over share', m.nonResSpread, m.nonResSpread === 0) +
+      card('Gender imbalance', m.genderImb, m.genderImb <= 1) +
+      card('Repeat groupmate pairs', m.repeatPairs, m.repeatPairs === 0) +
+      card('Total penalty', penalty, penalty === 0);
+    const flagList = [...flags.entries()], warnList = [...warns.entries()];
+    const conflictRows = (workbook.Conflicts || []).filter(r => norm(r.TypeA_ID) && norm(r.TypeB_ID)).length;
     sc.innerHTML =
-      `<div class="sc-hard">${hard}</div><div class="sc-soft">${soft}</div>` +
+      `<div class="sc-hard">${hard}</div><div class="sc-cards">${cards}</div>` +
       (flagList.length
-        ? `<div class="issue err" style="margin-top:.6rem"><b>${flagList.length} student(s) break a hard rule:</b> ` +
+        ? `<div class="issue err"><b>${flagList.length} student(s) break a hard rule:</b> ` +
           flagList.map(([sid, v]) => `${escapeHtml(nameOf(sid))} — ${escapeHtml(v.rule)} (${escapeHtml(v.detail)})`).join('; ') +
           `. Move them, or fix the input and re-solve.</div>`
-        : `<div class="issue" style="margin-top:.6rem;background:var(--accent-bg);border-left:3px solid var(--ok)">✓ All hard rules satisfied.</div>`) +
+        : `<div class="issue ok-note">✓ All hard rules satisfied.</div>`) +
+      (warnList.length
+        ? `<div class="issue warn"><b>${warnList.length} conflict warning(s):</b> ` +
+          warnList.map(([sid, v]) => `${escapeHtml(nameOf(sid))} ${escapeHtml(v.detail || v.rule)}`).join('; ') +
+          `. Conflicts are advisory — separate them if you can.</div>`
+        : (conflictRows ? `<div class="issue ok-note">✓ All ${conflictRows} conflict rule(s) respected.</div>` : '')) +
       (res.capacityShortfall
-        ? `<div class="issue warn" style="margin-top:.4rem">${res.capacityShortfall} more student(s) than total seats — add a group or raise a tutor's Max Students.</div>` : '');
+        ? `<div class="issue warn">${res.capacityShortfall} more student(s) than total seats — add a group or raise a tutor's Max Students.</div>` : '');
 
     $('boardActions').classList.remove('hidden');
     board.className = 'board';
@@ -1310,9 +1329,10 @@
         const s = students.get(sid) || {};
         const tags = [up(s.Imi) === 'Y' ? 'Imi Hoʻōla' : '', up(s.Resident) === 'N' ? 'Non-resident' : '',
                       genderLabel(s.Gender), norm(s.ScheduleTag) ? tagLabel(s.ScheduleTag) : ''].filter(Boolean).join(' · ');
-        const f = flags.get(sid), lk = locked.has(sid);
-        return `<div class="chip${f ? ' flag' : ''}${lk ? ' locked' : ''}" draggable="true" data-sid="${escapeAttr(sid)}"` +
-          (f ? ` title="${escapeAttr(f.rule + ': ' + f.detail)}"` : '') + `>` +
+        const f = flags.get(sid), wn = warns.get(sid), lk = locked.has(sid);
+        const tip = f || wn;
+        return `<div class="chip${f ? ' flag' : wn ? ' warn' : ''}${lk ? ' locked' : ''}" draggable="true" data-sid="${escapeAttr(sid)}"` +
+          (tip ? ` title="${escapeAttr(tip.rule + ': ' + tip.detail)}"` : '') + `>` +
           `<div class="chip-row"><span class="cname">${escapeHtml(norm(s.Name) || sid)}</span>` +
           `<button class="lockbtn" data-sid="${escapeAttr(sid)}" aria-label="${lk ? 'Locked' : 'Lock in place'}" title="${lk ? 'Locked — kept in place on re-solve' : 'Lock in place'}">${lk ? ICONS.lock : ICONS.unlock}</button></div>` +
           (tags ? `<div class="ctags">${escapeHtml(tags)}</div>` : '') + `</div>`;
