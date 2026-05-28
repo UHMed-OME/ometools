@@ -1128,14 +1128,31 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
 
   // This unit's group slots, with parsed co-tutors and a capacity (min of tutor caps, default 6).
   // Groups are not cohort-specific — the same unit slots are reused for whichever class is solved.
+  // If the Groups sheet defines no rows for the unit, auto-build ONE GROUP PER TUTOR assigned to
+  // it (a tutor with no Units listed counts for any unit): time slot from their Availability (a
+  // single AM/PM; blank if they cover both), capacity from Max Students. So creating the Groups
+  // sheet is optional — it only overrides this default.
   function groupsForUnit(wb, unit, tutorsById) {
-    return (wb.Groups || []).filter(g => norm(g.Unit) === unit).map((g) => {
+    const defined = (wb.Groups || []).filter(g => norm(g.Unit) === unit);
+    if (defined.length) return defined.map((g) => {
       const tutors = splitIds(g.TutorIDs);
       const caps = tutors.map(t => { const tt = tutorsById.get(t); const n = tt ? Number(tt.MaxStudents) : NaN;
                                      return isFinite(n) && n > 0 ? n : 6; });
       return { GroupID: norm(g.GroupID), TimeSlot: norm(g.TimeSlot), tutors,
                capacity: caps.length ? Math.min(...caps) : 6 };
     });
+    const u = unit.toUpperCase();
+    const out = [];
+    (wb.Tutors || []).forEach((t) => {
+      const tid = norm(t.TutorID); if (!tid) return;
+      const units = splitIds(t.Units).map(x => x.toUpperCase());
+      if (units.length && !units.includes(u)) return;          // tutor not assigned to this unit
+      const avail = splitIds(t.Availability).map(x => x.toUpperCase());
+      const n = Number(t.MaxStudents);
+      out.push({ GroupID: 'G' + (out.length + 1), TimeSlot: avail.length === 1 ? avail[0] : '',
+                 tutors: [tid], capacity: isFinite(n) && n > 0 ? n : 6 });
+    });
+    return out;
   }
 
   // Schedule fit (spec §3.4, open question §7.5): `Exception:<Day>-AM/PM` binds the student
@@ -1317,7 +1334,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     const w = weights || defaultWeights();
     if (!groups.length)
       return { unit, cohort: co, groups: [], violations: [], capacityShortfall: students.length,
-               scorecard: null, error: `No groups are defined for ${unit}${co ? ` / ${co}` : ''}. Add rows to the Groups sheet.` };
+               scorecard: null, error: `No groups for ${unit}. Assign tutors to ${unit} (Units column) or add rows to the Groups sheet.` };
 
     // Resolve lock GroupIDs to indices for this unit's groups.
     const gidIndex = new Map(groups.map((g, gi) => [g.GroupID, gi]));
@@ -1351,11 +1368,13 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
 
   // ---- Solver UI ---------------------------------------------------------
   function renderSolverControls() {
-    const units = [...new Set((workbook.Groups || []).map(g => norm(g.Unit)).filter(Boolean))]
-      .sort((a, b) => UNITS.indexOf(a) - UNITS.indexOf(b));
-    $('unitSel').innerHTML = units.length
-      ? units.map(u => `<option value="${escapeAttr(u)}">${escapeHtml(u)}</option>`).join('')
-      : `<option value="">(no rows in Groups sheet)</option>`;
+    // Units come from the Groups sheet and/or the tutors' Units (so auto-built groups still
+    // give a unit list); if neither specifies any, offer all MD1–MD7.
+    const fromGroups = (workbook.Groups || []).map(g => norm(g.Unit));
+    const fromTutors = (workbook.Tutors || []).flatMap(t => splitIds(t.Units).map(x => x.toUpperCase()));
+    let units = [...new Set([...fromGroups, ...fromTutors].filter(Boolean))].sort((a, b) => UNITS.indexOf(a) - UNITS.indexOf(b));
+    if (!units.length) units = UNITS.slice();
+    $('unitSel').innerHTML = units.map(u => `<option value="${escapeAttr(u)}">${escapeHtml(u)}</option>`).join('');
     // Class/cohort + unit are pulled from the loaded data (not hardcoded).
     // Show the Class picker whenever any cohort is present so the operator sees which class.
     const cohorts = [...new Set((workbook.Students || []).map(s => norm(s.Cohort)).filter(Boolean))].sort();

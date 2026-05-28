@@ -168,4 +168,14 @@ assert.ok(noCohort.error || noCohort.groups.every(g => g.students.length === 0),
   'a cohort with no matching group slots yields no placements (flagged, not fudged)');
 console.log('✓ cohort filtering scopes the solve to the chosen class');
 
+// --- Test 10: with no Groups sheet, auto-build one group per assigned tutor --
+const autoWb = app.makeExample();
+autoWb.Groups = [];                       // no slots defined → derive from tutors
+const autoSol = app.solve(autoWb, 'MD2', app.defaultWeights());
+assert.equal(autoSol.groups.length, 14, 'auto-builds one group per MD2 tutor (14)');
+assert.ok(autoSol.groups.every(g => g.tutors.length === 1), 'one tutor per auto-built group');
+assert.equal(autoSol.groups.reduce((n, g) => n + g.students.length, 0), 80, 'all placed via auto-built groups');
+assert.equal(autoSol.violations.length, 0, 'auto-built groups solve cleanly');
+console.log('✓ auto-built groups (no Groups sheet) place all 80 cleanly');
+
 console.log('\nALL TESTS PASSED');
