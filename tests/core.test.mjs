@@ -25,7 +25,7 @@ assert.ok(XLSX && XLSX.utils, 'SheetJS failed to load');
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const m = html.match(/<script>\s*([\s\S]*?)<\/script>\s*<\/body>/i);
 assert.ok(m, 'could not locate the app <script> block');
-const appSrc = m[1] + '\n;globalThis.__app = { validate, parseWorkbook, buildWorkbook, parsePasted, solve, defaultWeights, makeExample, TEMPLATE, SCHEMA, SHEET_ORDER };';
+const appSrc = m[1] + '\n;globalThis.__app = { validate, parseWorkbook, buildWorkbook, parsePasted, solve, defaultWeights, makeExample, resultSheets, TEMPLATE, SCHEMA, SHEET_ORDER };';
 
 // 3. Minimal stubs for the DOM/browser globals referenced at load time.
 const stubEl = () => new Proxy({}, {
@@ -139,5 +139,22 @@ assert.equal(groupIdOf('S20'), 'G7', 'locked student S20 stays in G7');
 const lockedPlaced = lockedSol.groups.reduce((n, g) => n + g.students.length, 0);
 assert.equal(lockedPlaced, 80, 'all students still placed with locks applied');
 console.log('✓ locked students are pinned to their groups across a re-solve');
+
+// --- Test 8: write-back produces Results rows + appended, idempotent history ---
+const wbEx = app.makeExample();
+const solEx = app.solve(wbEx, 'MD2', app.defaultWeights());
+const sheets1 = app.resultSheets(solEx, wbEx);
+assert.equal(sheets1.results.length, 80, 'Results has one row per placed student');
+assert.ok(sheets1.results.every(r => r.Unit === 'MD2' && r.GroupID && r.StudentID),
+  'Results rows carry Unit/Group/Student');
+const md2Hist = sheets1.history.filter(r => r.Unit === 'MD2');
+assert.equal(md2Hist.length, 80, 'one MD2 history row per student (single-tutor groups)');
+assert.ok(sheets1.history.some(r => r.Unit === 'MD1'), 'prior MD1 history is preserved');
+// Idempotent: feeding the merged history back in and re-merging keeps MD2 count stable.
+const wbAgain = { ...wbEx, PBLHistory: sheets1.history };
+const sheets2 = app.resultSheets(solEx, wbAgain);
+assert.equal(sheets2.history.filter(r => r.Unit === 'MD2').length, 80,
+  're-export replaces (not duplicates) this unit\'s history rows');
+console.log(`✓ write-back: ${sheets1.results.length} Results rows, MD2 history appended idempotently`);
 
 console.log('\nALL TESTS PASSED');

@@ -175,6 +175,20 @@
     .gcount { font-size: 0.82rem; color: var(--muted); padding: 0 0.8rem 0.6rem; }
     .board-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin: 0.2rem 0 0.9rem; }
     .board-actions .hint { flex: 1 1 280px; }
+
+    /* --- Printable / PDF roster (hidden on screen, shown only when printing) --- */
+    .print-only { display: none; }
+    @media print {
+      header, main > *:not(#printRoster) { display: none !important; }
+      #printRoster { display: block !important; color: #000; }
+      #printRoster h1 { font-size: 18pt; margin: 0 0 0.5rem; }
+      #printRoster .rgroup { page-break-inside: avoid; break-inside: avoid; margin: 0 0 14pt; }
+      #printRoster h2 { font-size: 12.5pt; margin: 0 0 4pt; border-bottom: 1.5pt solid #000; padding-bottom: 2pt; }
+      #printRoster .rcount { font-weight: 400; color: #444; }
+      #printRoster ol { margin: 4pt 0 0; padding-left: 22pt; }
+      #printRoster li { font-size: 11pt; margin: 1.5pt 0; }
+      #printRoster .rtags { color: #555; font-size: 9.5pt; }
+    }
   </style>
 </head>
 <body>
@@ -246,9 +260,13 @@
         <span class="hint" style="margin:0">Drag a student between groups to adjust. A red chip breaks a hard rule (hover for why). Lock 🔒 anyone you want kept in place, then re-solve.</span>
         <button id="btnResolve">↻ Re-solve (keep locked)</button>
         <button id="btnUnlockAll">Unlock all</button>
+        <button id="btnPrint">🖨 Print / Save PDF roster</button>
       </div>
       <div id="board"></div>
     </section>
+
+    <!-- Printable roster: hidden on screen, shown only when printing (Save as PDF). -->
+    <div id="printRoster" class="print-only"></div>
 
     <div id="placeholder" class="empty">
       Load a workbook or paste rows to begin — or click <strong>Load example data</strong> to
@@ -1171,6 +1189,68 @@
     XLSX.writeFile(wb, filename, { compression: true });
   }
 
+  // ---- Phase 4: write the solved assignment back into the workbook --------
+  // Pure: from a solve `result` + the workbook, produce the per-unit Results rows
+  // and a PBLHistory with this unit's rows replaced (idempotent re-export). A
+  // co-tutored group writes one history row per tutor so repeat-avoidance sees all.
+  function resultSheets(result, wb) {
+    const unit = norm(result.unit);
+    const tutorName = new Map((wb.Tutors || []).map(t => [norm(t.TutorID), norm(t.Name)]));
+    const studName  = new Map((wb.Students || []).map(s => [norm(s.StudentID), norm(s.Name)]));
+    const results = [], history = [];
+    result.groups.forEach(g => {
+      g.students.forEach(sid => {
+        results.push({ Unit: unit, GroupID: g.GroupID, TimeSlot: g.TimeSlot,
+          TutorIDs: g.tutors.join('; '), TutorNames: g.tutors.map(t => tutorName.get(t) || t).join('; '),
+          StudentID: sid, StudentName: studName.get(sid) || sid });
+        (g.tutors.length ? g.tutors : ['']).forEach(t =>
+          history.push({ Unit: unit, StudentID: sid, GroupID: g.GroupID, TutorID: t }));
+      });
+    });
+    const mergedHistory = (wb.PBLHistory || []).filter(r => norm(r.Unit) !== unit).concat(history);
+    return { results, history: mergedHistory };
+  }
+  const RESULTS_COLS = ['Unit', 'GroupID', 'TimeSlot', 'TutorIDs', 'TutorNames', 'StudentID', 'StudentName'];
+
+  // Build the export workbook: all canonical sheets (with edits), and — when a clean
+  // solve exists — a Results sheet plus this unit's rows appended to PBLHistory.
+  function exportWorkbook() {
+    const data = {};
+    SHEET_ORDER.forEach(n => data[n] = (workbook[n] || []).map(r => ({ ...r })));
+    let results = null;
+    if (lastResult && !lastResult.error) {
+      const sheets = resultSheets(lastResult, workbook);
+      results = sheets.results;
+      data.PBLHistory = sheets.history;
+    }
+    const wb = buildWorkbook(data);
+    if (results) {
+      const shaped = results.map(r => { const o = {}; RESULTS_COLS.forEach(c => o[c] = r[c] == null ? '' : r[c]); return o; });
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(shaped, { header: RESULTS_COLS }), 'Results');
+    }
+    return wb;
+  }
+
+  // Printable / PDF roster (browser print → Save as PDF; fully offline).
+  function printRoster() {
+    if (!lastResult || lastResult.error) return;
+    const tutorName = new Map((workbook.Tutors || []).map(t => [norm(t.TutorID), norm(t.Name)]));
+    const studById = new Map((workbook.Students || []).map(s => [norm(s.StudentID), s]));
+    const groups = lastResult.groups.map(g => {
+      const tut = g.tutors.map(t => tutorName.get(t) || t).join(', ') || '—';
+      const lis = g.students.map(sid => {
+        const s = studById.get(sid) || {};
+        const tags = [up(s.Imi) === 'Y' ? 'Imi Hoʻōla' : '', up(s.Resident) === 'N' ? 'Non-resident' : '',
+                      norm(s.ScheduleTag) ? tagLabel(s.ScheduleTag) : ''].filter(Boolean).join(' · ');
+        return `<li>${escapeHtml(norm(s.Name) || sid)}${tags ? ` <span class="rtags">— ${escapeHtml(tags)}</span>` : ''}</li>`;
+      }).join('');
+      return `<section class="rgroup"><h2>${escapeHtml(g.GroupID)} · ${escapeHtml(g.TimeSlot || '—')} · ${escapeHtml(tut)}` +
+             ` <span class="rcount">(${g.students.length})</span></h2><ol>${lis}</ol></section>`;
+    }).join('');
+    $('printRoster').innerHTML = `<h1>PBL Groups — ${escapeHtml(lastResult.unit)}</h1>${groups}`;
+    window.print();
+  }
+
   // Shared load pipeline: validate, render the editor, enable export.
   function loadWorkbook(wb, label, focusSheet) {
     workbook = wb;
@@ -1307,8 +1387,11 @@
 
   $('btnExport').onclick = () => {
     if (!workbook) return;
-    download(buildWorkbook(workbook), 'PBL_export.xlsx');
+    const solved = lastResult && !lastResult.error;
+    const name = solved ? `PBL_${lastResult.unit}_results.xlsx` : 'PBL_export.xlsx';
+    download(exportWorkbook(), name);
   };
+  $('btnPrint').onclick = printRoster;
 
   // Start with example data loaded so the operator sees a working editor + board
   // immediately. Gated on a real DOM (skipped under the headless test harness).
