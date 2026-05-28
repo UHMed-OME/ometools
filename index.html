@@ -6,32 +6,404 @@
   <meta name="robots" content="noindex">
   <title>PBL Group Builder</title>
   <style>
-    :root { color-scheme: light dark; }
+    :root {
+      --bg: #ffffff; --fg: #1a1a1a; --muted: #666; --line: #e2e2e2;
+      --accent: #0a7d5a; --accent-bg: rgba(10,125,90,0.08);
+      --err: #c0392b; --err-bg: rgba(192,57,43,0.08);
+      --warn: #b8860b; --warn-bg: rgba(184,134,11,0.10);
+      --ok: #0a7d5a;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg:#1b1d1e; --fg:#e8e8e8; --muted:#9aa0a6; --line:#34383b;
+              --accent-bg:rgba(46,204,113,0.12); --err-bg:rgba(231,76,60,0.14);
+              --warn-bg:rgba(241,196,15,0.14); }
+    }
+    * { box-sizing: border-box; }
     body {
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      max-width: 42rem; margin: 4rem auto; padding: 0 1.25rem; line-height: 1.6;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: var(--fg); background: var(--bg); margin: 0; line-height: 1.5;
     }
-    h1 { margin-bottom: 0.25rem; }
-    .tag { color: #666; font-size: 0.95rem; margin-top: 0; }
+    header { padding: 1.25rem 1.5rem 0.5rem; }
+    h1 { margin: 0; font-size: 1.4rem; }
+    .tag { color: var(--muted); margin: 0.15rem 0 0; font-size: 0.9rem; }
+    main { padding: 1rem 1.5rem 4rem; max-width: 1200px; }
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center;
+      padding: 0.9rem 0; border-bottom: 1px solid var(--line); margin-bottom: 1rem;
+    }
+    button, .filebtn {
+      font: inherit; cursor: pointer; border: 1px solid var(--line);
+      background: var(--bg); color: var(--fg); padding: 0.5rem 0.9rem;
+      border-radius: 6px; transition: background 0.12s;
+    }
+    button:hover, .filebtn:hover { background: var(--accent-bg); }
+    button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    button.primary:hover { filter: brightness(1.08); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .filebtn { display: inline-flex; align-items: center; gap: 0.4rem; }
+    input[type=file] { display: none; }
     .note {
-      border-left: 3px solid #0a7; background: rgba(0,170,119,0.07);
-      padding: 0.75rem 1rem; border-radius: 4px; margin: 1.5rem 0;
+      border-left: 3px solid var(--accent); background: var(--accent-bg);
+      padding: 0.6rem 0.9rem; border-radius: 4px; margin: 0 0 1rem; font-size: 0.9rem;
     }
-    code { background: rgba(127,127,127,0.18); padding: 0.1rem 0.35rem; border-radius: 3px; }
+    #validation { margin: 1rem 0; }
+    .vsummary { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; font-weight: 600; }
+    .pill { padding: 0.15rem 0.6rem; border-radius: 999px; font-size: 0.85rem; }
+    .pill.ok { background: var(--accent-bg); color: var(--ok); }
+    .pill.err { background: var(--err-bg); color: var(--err); }
+    .pill.warn { background: var(--warn-bg); color: var(--warn); }
+    .issue { padding: 0.4rem 0.7rem; border-radius: 5px; margin-bottom: 0.35rem; font-size: 0.88rem; }
+    .issue.err { background: var(--err-bg); border-left: 3px solid var(--err); }
+    .issue.warn { background: var(--warn-bg); border-left: 3px solid var(--warn); }
+    .issue .loc { font-weight: 600; }
+    .tabs { display: flex; gap: 0.3rem; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-top: 1.25rem; }
+    .tab {
+      padding: 0.45rem 0.85rem; border: 1px solid transparent; border-bottom: none;
+      border-radius: 6px 6px 0 0; cursor: pointer; font-size: 0.9rem; color: var(--muted);
+    }
+    .tab.active { color: var(--fg); border-color: var(--line); background: var(--bg);
+      margin-bottom: -1px; font-weight: 600; }
+    .tab .count { color: var(--muted); font-weight: 400; }
+    .sheet-wrap { overflow: auto; border: 1px solid var(--line); border-top: none; border-radius: 0 0 6px 6px; }
+    table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+    th, td { text-align: left; padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    th { background: var(--accent-bg); position: sticky; top: 0; }
+    tr.badrow td { background: var(--err-bg); }
+    .empty { color: var(--muted); padding: 1.5rem; text-align: center; }
+    .hidden { display: none; }
+    code { background: rgba(127,127,127,0.18); padding: 0.05rem 0.3rem; border-radius: 3px; }
   </style>
 </head>
 <body>
-  <h1>PBL Group Builder</h1>
-  <p class="tag">JABSOM Problem-Based Learning group assignment &mdash; MD1&ndash;MD7</p>
+  <header>
+    <h1>PBL Group Builder</h1>
+    <p class="tag">JABSOM Problem-Based Learning group assignment &mdash; MD1&ndash;MD7</p>
+  </header>
+  <main>
+    <div class="note">
+      <strong>Offline &amp; FERPA-safe.</strong> Everything runs in this browser tab. Your workbook is
+      read locally, processed in memory, and written back to your Downloads folder. No data is uploaded.
+    </div>
 
-  <div class="note">
-    <strong>Offline &amp; FERPA-safe by design.</strong> This tool runs entirely in your
-    browser. Student data is read from your local workbook, processed in this tab, and
-    written back to your Downloads folder. Nothing is uploaded or sent anywhere.
-  </div>
+    <div class="toolbar">
+      <button id="btnTemplate">⬇ Download blank template</button>
+      <label class="filebtn">
+        📂 Load workbook (.xlsx / .csv)
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+      </label>
+      <button id="btnExport" class="primary" disabled>⬆ Export workbook (round-trip)</button>
+      <span id="loadedName" class="tag"></span>
+    </div>
 
-  <p><em>Placeholder.</em> The application is not built yet &mdash; this page exists so the
-  GitHub Pages URL resolves. The implementation will replace this file with the
-  self-contained single-file app described in <code>PBL_Group_Builder_Spec.md</code>.</p>
+    <div id="validation" class="hidden">
+      <div class="vsummary" id="vsummary"></div>
+      <div id="issues"></div>
+    </div>
+
+    <div id="tabs" class="tabs hidden"></div>
+    <div id="sheetView" class="sheet-wrap hidden"></div>
+
+    <div id="placeholder" class="empty">
+      Load a workbook to begin, or download the blank template to see the expected format.
+    </div>
+  </main>
+
+  <script src="vendor/xlsx.full.min.js"></script>
+  <script>
+  /* =========================================================================
+     PBL Group Builder — Phase 1: data + validation + FERPA-safe round-trip.
+     Pure client-side. The workbook is the source of truth (see spec §2).
+     ========================================================================= */
+
+  // ---- Schema: the data contract (spec §2) -------------------------------
+  // Each sheet lists required columns; validation keys off these.
+  const SCHEMA = {
+    Students: { key: 'StudentID',
+      required: ['StudentID', 'Name', 'Gender', 'Imi', 'Resident', 'LCMentorID', 'ScheduleTag'] },
+    Tutors:   { key: 'TutorID',
+      required: ['TutorID', 'Name', 'Availability', 'MaxStudents', 'CoTutorOK'] },
+    Conflicts:{ key: null,
+      required: ['TypeA_ID', 'TypeB_ID', 'Kind', 'Reason'] },
+    Groups:   { key: null,
+      required: ['Unit', 'GroupID', 'TimeSlot', 'TutorIDs'] },
+    // NOTE: Excel reserves the worksheet name "History" (change-tracking),
+    // so the spec's "History" sheet is stored as "PBLHistory" — same columns.
+    PBLHistory: { key: null,
+      required: ['Unit', 'StudentID', 'GroupID', 'TutorID'] },
+  };
+  const SHEET_ORDER = ['Students', 'Tutors', 'Conflicts', 'Groups', 'PBLHistory'];
+  const UNITS = ['MD1','MD2','MD3','MD4','MD5','MD6','MD7'];
+  const YN = new Set(['Y', 'N', '']);
+
+  // Template example rows — illustrate format; IDs are obviously fake.
+  const TEMPLATE = {
+    Students: [
+      { StudentID:'AB01', Name:'Alex Brown',  Gender:'F', Imi:'N', Resident:'Y', LCMentorID:'T01', ScheduleTag:'' },
+      { StudentID:'CD02', Name:'Casey Diaz',  Gender:'M', Imi:'Y', Resident:'Y', LCMentorID:'T02', ScheduleTag:'ImiGA' },
+      { StudentID:'EF03', Name:'Erin Fields', Gender:'F', Imi:'N', Resident:'N', LCMentorID:'T01', ScheduleTag:'Exception:Tue-AM' },
+    ],
+    Tutors: [
+      { TutorID:'T01', Name:'Dr. Lee',  Availability:'AM,PM', MaxStudents:6, CoTutorOK:'Y' },
+      { TutorID:'T02', Name:'Dr. Kana', Availability:'AM',    MaxStudents:6, CoTutorOK:'N' },
+      { TutorID:'T03', Name:'Dr. Sato', Availability:'PM',    MaxStudents:5, CoTutorOK:'Y' },
+    ],
+    Conflicts: [
+      { TypeA_ID:'AB01', TypeB_ID:'CD02', Kind:'student-student', Reason:'prior issue' },
+      { TypeA_ID:'T02',  TypeB_ID:'EF03', Kind:'tutor-student',   Reason:'family' },
+    ],
+    Groups: [
+      { Unit:'MD1', GroupID:'G1', TimeSlot:'AM', TutorIDs:'T01' },
+      { Unit:'MD1', GroupID:'G2', TimeSlot:'PM', TutorIDs:'T03' },
+    ],
+    PBLHistory: [
+      { Unit:'MD1', StudentID:'AB01', GroupID:'G1', TutorID:'T01' },
+    ],
+  };
+
+  // ---- State -------------------------------------------------------------
+  let workbook = null;       // { Students:[...], Tutors:[...], ... } row objects
+  let activeTab = null;
+  let badRows = {};          // sheet -> Set of row indices flagged by validation
+
+  // ---- Helpers -----------------------------------------------------------
+  const $ = (id) => document.getElementById(id);
+  const norm = (v) => (v == null ? '' : String(v).trim());
+  const up = (v) => norm(v).toUpperCase();
+
+  function splitIds(v) {
+    return norm(v).split(/[,;/]+/).map(s => s.trim()).filter(Boolean);
+  }
+
+  // ---- Parsing: workbook -> {sheet: rows} --------------------------------
+  function rowsFromSheet(ws) {
+    // defval:'' keeps empty cells as '' so columns stay aligned.
+    return XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
+  }
+
+  function parseWorkbook(data, filename) {
+    const isCsv = /\.csv$/i.test(filename);
+    const wb = XLSX.read(data, { type: isCsv ? 'string' : 'array' });
+    const out = {};
+    if (isCsv) {
+      // A CSV holds a single table; infer which sheet by its headers.
+      const rows = rowsFromSheet(wb.Sheets[wb.SheetNames[0]]);
+      const headers = rows.length ? Object.keys(rows[0]) : [];
+      const match = SHEET_ORDER.find(name =>
+        SCHEMA[name].required.every(c => headers.includes(c)) ||
+        // lenient: at least the key column present
+        (SCHEMA[name].key && headers.includes(SCHEMA[name].key)));
+      out[match || 'Students'] = rows;
+    } else {
+      for (const name of wb.SheetNames) {
+        const canonical = SHEET_ORDER.find(s => s.toLowerCase() === name.trim().toLowerCase());
+        out[canonical || name] = rowsFromSheet(wb.Sheets[name]);
+      }
+    }
+    return out;
+  }
+
+  // ---- Validation (spec §5 step 2) ---------------------------------------
+  // Returns { errors:[{loc,msg}], warnings:[...], badRows:{sheet:Set} }
+  function validate(wb) {
+    const errors = [], warnings = [];
+    const bad = {}; SHEET_ORDER.forEach(s => bad[s] = new Set());
+    const err  = (loc, msg, sheet, ri) => { errors.push({ loc, msg }); if (sheet) bad[sheet].add(ri); };
+    const warn = (loc, msg) => warnings.push({ loc, msg });
+
+    // Sheet presence + column presence
+    for (const name of SHEET_ORDER) {
+      const rows = wb[name];
+      if (!rows) {
+        // History/Conflicts may legitimately be empty on a fresh cohort.
+        if (name === 'PBLHistory' || name === 'Conflicts') warn(name, 'sheet missing — treated as empty');
+        else err(name, 'required sheet is missing');
+        continue;
+      }
+      if (rows.length) {
+        const have = new Set(Object.keys(rows[0]));
+        for (const col of SCHEMA[name].required) {
+          if (!have.has(col)) err(`${name}`, `missing required column "${col}"`);
+        }
+      }
+    }
+
+    const students = wb.Students || [];
+    const tutors   = wb.Tutors || [];
+    const studentIds = new Set();
+    const tutorIds   = new Set();
+
+    // Students
+    students.forEach((r, i) => {
+      const id = norm(r.StudentID);
+      const loc = `Students row ${i + 2}`;
+      if (!id) { err(loc, 'blank StudentID', 'Students', i); }
+      else if (studentIds.has(id)) { err(loc, `duplicate StudentID "${id}"`, 'Students', i); }
+      else studentIds.add(id);
+      if (!norm(r.Name)) warn(loc, 'blank Name');
+      if (!YN.has(up(r.Imi)))      err(loc, `Imi must be Y/N (got "${norm(r.Imi)}")`, 'Students', i);
+      if (!YN.has(up(r.Resident))) err(loc, `Resident must be Y/N (got "${norm(r.Resident)}")`, 'Students', i);
+    });
+
+    // Tutors
+    tutors.forEach((r, i) => {
+      const id = norm(r.TutorID);
+      const loc = `Tutors row ${i + 2}`;
+      if (!id) { err(loc, 'blank TutorID', 'Tutors', i); }
+      else if (tutorIds.has(id)) { err(loc, `duplicate TutorID "${id}"`, 'Tutors', i); }
+      else tutorIds.add(id);
+      const max = norm(r.MaxStudents);
+      if (max && isNaN(Number(max))) err(loc, `MaxStudents must be a number (got "${max}")`, 'Tutors', i);
+      if (!YN.has(up(r.CoTutorOK))) warn(loc, `CoTutorOK should be Y/N (got "${norm(r.CoTutorOK)}")`);
+    });
+
+    // Cross-refs: LC mentor must be a known tutor
+    students.forEach((r, i) => {
+      const m = norm(r.LCMentorID);
+      if (m && !tutorIds.has(m))
+        err(`Students row ${i + 2}`, `LCMentorID "${m}" is not in the Tutors sheet`, 'Students', i);
+    });
+
+    // Conflicts
+    (wb.Conflicts || []).forEach((r, i) => {
+      const a = norm(r.TypeA_ID), b = norm(r.TypeB_ID), kind = norm(r.Kind).toLowerCase();
+      const loc = `Conflicts row ${i + 2}`;
+      if (!a || !b) { err(loc, 'both TypeA_ID and TypeB_ID are required', 'Conflicts', i); return; }
+      if (kind === 'student-student') {
+        if (!studentIds.has(a)) err(loc, `"${a}" is not a known student`, 'Conflicts', i);
+        if (!studentIds.has(b)) err(loc, `"${b}" is not a known student`, 'Conflicts', i);
+      } else if (kind === 'tutor-student') {
+        const okAB = tutorIds.has(a) && studentIds.has(b);
+        const okBA = tutorIds.has(b) && studentIds.has(a);
+        if (!okAB && !okBA)
+          err(loc, `tutor-student pair "${a}"/"${b}" must be one tutor and one student`, 'Conflicts', i);
+      } else {
+        err(loc, `Kind must be "student-student" or "tutor-student" (got "${norm(r.Kind)}")`, 'Conflicts', i);
+      }
+    });
+
+    // Groups
+    (wb.Groups || []).forEach((r, i) => {
+      const loc = `Groups row ${i + 2}`;
+      const unit = norm(r.Unit);
+      if (!UNITS.includes(unit)) err(loc, `Unit must be one of MD1–MD7 (got "${unit}")`, 'Groups', i);
+      if (!norm(r.GroupID)) err(loc, 'blank GroupID', 'Groups', i);
+      const tids = splitIds(r.TutorIDs);
+      if (!tids.length) warn(loc, 'no TutorIDs listed');
+      tids.forEach(t => { if (!tutorIds.has(t)) err(loc, `TutorID "${t}" is not in the Tutors sheet`, 'Groups', i); });
+    });
+
+    // PBLHistory (referential integrity; missing refs are warnings, not blockers)
+    (wb.PBLHistory || []).forEach((r, i) => {
+      const loc = `PBLHistory row ${i + 2}`;
+      const sid = norm(r.StudentID), tid = norm(r.TutorID);
+      if (sid && !studentIds.has(sid)) warn(loc, `StudentID "${sid}" not in Students (stale history?)`);
+      if (tid && !tutorIds.has(tid)) warn(loc, `TutorID "${tid}" not in Tutors (stale history?)`);
+    });
+
+    return { errors, warnings, badRows: bad };
+  }
+
+  // ---- Rendering ---------------------------------------------------------
+  function renderValidation(res) {
+    const v = $('validation'); v.classList.remove('hidden');
+    const nE = res.errors.length, nW = res.warnings.length;
+    $('vsummary').innerHTML =
+      (nE === 0
+        ? `<span class="pill ok">✓ No blocking errors</span>`
+        : `<span class="pill err">${nE} error${nE>1?'s':''}</span>`) +
+      (nW ? `<span class="pill warn">${nW} warning${nW>1?'s':''}</span>` : '');
+    const row = (cls, x) => `<div class="issue ${cls}"><span class="loc">${x.loc}:</span> ${x.msg}</div>`;
+    $('issues').innerHTML =
+      res.errors.map(e => row('err', e)).join('') +
+      res.warnings.map(w => row('warn', w)).join('');
+  }
+
+  function renderTabs() {
+    const tabs = $('tabs'); tabs.classList.remove('hidden'); tabs.innerHTML = '';
+    SHEET_ORDER.forEach(name => {
+      const rows = workbook[name] || [];
+      const el = document.createElement('div');
+      el.className = 'tab' + (name === activeTab ? ' active' : '');
+      el.innerHTML = `${name} <span class="count">(${rows.length})</span>`;
+      el.onclick = () => { activeTab = name; renderTabs(); renderSheet(); };
+      tabs.appendChild(el);
+    });
+  }
+
+  function renderSheet() {
+    const view = $('sheetView'); view.classList.remove('hidden');
+    const rows = workbook[activeTab] || [];
+    if (!rows.length) { view.innerHTML = `<div class="empty">${activeTab} is empty.</div>`; return; }
+    const cols = SCHEMA[activeTab] ? SCHEMA[activeTab].required : Object.keys(rows[0]);
+    const bad = badRows[activeTab] || new Set();
+    const head = cols.map(c => `<th>${c}</th>`).join('');
+    const body = rows.map((r, i) =>
+      `<tr class="${bad.has(i) ? 'badrow' : ''}">` +
+      cols.map(c => `<td>${escapeHtml(norm(r[c]))}</td>`).join('') + `</tr>`).join('');
+    view.innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+  }
+
+  // ---- Workbook build / export -------------------------------------------
+  function buildWorkbook(data) {
+    const wb = XLSX.utils.book_new();
+    for (const name of SHEET_ORDER) {
+      const rows = data[name] || [];
+      const cols = SCHEMA[name].required;
+      // Normalize each row to the canonical column set/order.
+      const shaped = rows.map(r => {
+        const o = {}; cols.forEach(c => o[c] = r[c] == null ? '' : r[c]); return o;
+      });
+      const ws = XLSX.utils.json_to_sheet(shaped, { header: cols });
+      XLSX.utils.book_append_sheet(wb, ws, name);
+    }
+    return wb;
+  }
+
+  function download(wb, filename) {
+    XLSX.writeFile(wb, filename, { compression: true });
+  }
+
+  // ---- Wiring ------------------------------------------------------------
+  $('btnTemplate').onclick = () => {
+    download(buildWorkbook(TEMPLATE), 'PBL_template.xlsx');
+  };
+
+  $('fileInput').onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const isCsv = /\.csv$/i.test(file.name);
+        const data = isCsv ? ev.target.result : new Uint8Array(ev.target.result);
+        workbook = parseWorkbook(data, file.name);
+        const res = validate(workbook);
+        badRows = res.badRows;
+        activeTab = SHEET_ORDER.find(s => (workbook[s] || []).length) || 'Students';
+        $('placeholder').classList.add('hidden');
+        renderValidation(res);
+        renderTabs();
+        renderSheet();
+        $('btnExport').disabled = false;
+        $('loadedName').textContent = `Loaded: ${file.name}`;
+      } catch (err) {
+        alert('Could not read this workbook:\n' + err.message);
+        console.error(err);
+      }
+    };
+    if (/\.csv$/i.test(file.name)) reader.readAsText(file);
+    else reader.readAsArrayBuffer(file);
+    e.target.value = ''; // allow re-loading the same file
+  };
+
+  $('btnExport').onclick = () => {
+    if (!workbook) return;
+    download(buildWorkbook(workbook), 'PBL_export.xlsx');
+  };
+  </script>
 </body>
 </html>

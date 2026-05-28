@@ -4,7 +4,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-This repository currently contains only `PBL_Group_Builder_Spec.md` — the full implementation spec. No code has been written yet. `PBL_Group_Builder_Spec.md` is the authoritative source for all architecture and behavior; read it before building, and treat its open questions (spec §7) as things to confirm with the operator rather than guess.
+**Phase 1 (data + validation + FERPA-safe round-trip) is implemented.** `PBL_Group_Builder_Spec.md` remains the authoritative source for all architecture and behavior; read it before building further, and treat its open questions (spec §7) as things to confirm with the operator rather than guess. Phases 2–4 (solver, interactive board, export polish) are not built yet.
+
+## Layout
+
+- `index.html` — the app. Loads `vendor/xlsx.full.min.js` via a relative `<script src>`. This is what GitHub Pages serves.
+- `vendor/xlsx.full.min.js` — vendored SheetJS (Apache-2.0), committed. Never load SheetJS from a CDN.
+- `build.mjs` — `node build.mjs` inlines SheetJS into `dist/pbl-group-builder.html`, the **single self-contained, emailable** file the spec mandates (spec §1). `dist/` is the distribution artifact.
+- `tests/core.test.mjs` — `node tests/core.test.mjs` runs the pure data logic (validation, build, round-trip) headlessly by extracting the app `<script>` from `index.html` and stubbing the DOM. No browser/deps needed.
+- `.nojekyll` — so Pages serves `vendor/` (Jekyll would skip it).
+
+### Deviation from spec
+Excel **reserves the worksheet name "History"** (change-tracking), so SheetJS (and Excel) reject it. The spec's `History` sheet is stored as **`PBLHistory`** — identical columns. This is the only schema name that differs from spec §2.
+
+## Commands
+
+- Run/preview: open `index.html` in a browser (`start index.html`), or open the bundled `dist/pbl-group-builder.html`.
+- Build single-file: `node build.mjs`
+- Test: `node tests/core.test.mjs`
+- After editing `index.html` or `vendor/`, re-run the build so `dist/` stays current.
 
 ## What this is
 
@@ -23,7 +41,7 @@ Sheets and key columns — see spec §2 for full column lists:
 - **`Tutors`** — `TutorID`, `Name`, `Availability`, `MaxStudents` (default 6), `CoTutorOK`.
 - **`Conflicts`** — `TypeA_ID`, `TypeB_ID`, `Kind` (`student-student` | `tutor-student`), `Reason`.
 - **`Groups`** — `Unit`, `GroupID`, `TimeSlot`, `TutorID(s)` — defines this unit's slots.
-- **`History`** — `Unit`, `StudentID`, `GroupID`, `TutorID` — auto-appended after each unit. This sheet **is** the repeat-avoidance engine: "no repeat tutor" scans prior `TutorID`s for a student; "avoid repeat groupmates" scans who shared a `GroupID`. Never require the operator to hand-edit it.
+- **`PBLHistory`** (spec calls it `History`; renamed — see Deviation above) — `Unit`, `StudentID`, `GroupID`, `TutorID` — auto-appended after each unit. This sheet **is** the repeat-avoidance engine: "no repeat tutor" scans prior `TutorID`s for a student; "avoid repeat groupmates" scans who shared a `GroupID`. Never require the operator to hand-edit it.
 
 Ship a template workbook with these exact headers and example rows.
 
