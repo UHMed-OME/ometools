@@ -476,7 +476,7 @@
     Students: { key: 'StudentID', essential: ['StudentID'],
       required: ['StudentID', 'Name', 'Gender', 'Imi', 'Resident', 'LCMentorID', 'ScheduleTag', 'Cohort'] },
     Tutors:   { key: 'TutorID', essential: ['TutorID'],
-      required: ['TutorID', 'Name', 'Units', 'Availability', 'MaxStudents', 'CoTutorOK'] },
+      required: ['TutorID', 'Name', 'Units', 'Day', 'Start', 'End', 'MaxStudents', 'CoTutorOK'] },
     Conflicts:{ key: null, essential: ['TypeA_ID', 'TypeB_ID', 'Kind'],
       required: ['TypeA_ID', 'TypeB_ID', 'Kind', 'Reason'] },
     Groups:   { key: null, essential: ['Unit', 'GroupID'],
@@ -494,7 +494,7 @@
   const UNITS = ['MD1','MD2','MD3','MD4','MD5','MD6','MD7'];
   // Weekly schedule grid (clock times replace the old AM/PM model).
   const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-  const HOURS = []; for (let h = 8; h <= 18; h++) HOURS.push((h < 10 ? '0' : '') + h + ':00');
+  const HOURS = []; for (let h = 8; h <= 18; h++) { const hh = (h < 10 ? '0' : '') + h; HOURS.push(hh + ':00'); if (h < 18) HOURS.push(hh + ':30'); }
   const timeToMin = (t) => { const m = /^(\d{1,2}):(\d{2})$/.exec(norm(t)); return m ? (+m[1]) * 60 + (+m[2]) : NaN; };
   const YN = new Set(['Y', 'N', '']);
   // Columns rendered as a Y/N toggle in the inline editor.
@@ -551,7 +551,6 @@
   // Static enums (canonical value stored; human label shown), scoped per sheet
   // so identifier columns like Tutors.TutorID stay free text.
   const GENDER_OPTS   = [{ value:'F', label:'Female' }, { value:'M', label:'Male' }, { value:'X', label:'Other / Nonbinary' }];
-  const AVAIL_OPTS    = [{ value:'AM', label:'Mornings (AM)' }, { value:'PM', label:'Afternoons (PM)' }, { value:'AM,PM', label:'Mornings & Afternoons (AM, PM)' }];
   const MAXSTU_OPTS   = [4,5,6,7,8].map(n => ({ value:String(n), label:`${n} students` }));
   const KIND_OPTS     = [{ value:'student-student', label:'Student ↔ Student' }, { value:'tutor-student', label:'Tutor ↔ Student' }];
   const UNIT_OPTS     = UNITS.map(u => ({ value:u, label:u }));
@@ -560,7 +559,7 @@
   // Per-(sheet, column) field kinds: `enum` = static list, `ref` = pick a record by name.
   const FIELD_KINDS = {
     Students:   { Gender: { enum: GENDER_OPTS }, LCMentorID: { ref: 'tutors' } },
-    Tutors:     { Availability: { enum: AVAIL_OPTS }, MaxStudents: { enum: MAXSTU_OPTS } },
+    Tutors:     { Day: { enum: DAY_OPTS }, Start: { enum: HOUR_OPTS }, End: { enum: HOUR_OPTS }, MaxStudents: { enum: MAXSTU_OPTS } },
     Conflicts:  { Kind: { enum: KIND_OPTS }, TypeA_ID: { ref: 'people' }, TypeB_ID: { ref: 'people' } },
     Groups:     { Unit: { enum: UNIT_OPTS }, Day: { enum: DAY_OPTS }, Start: { enum: HOUR_OPTS }, End: { enum: HOUR_OPTS } },
     PBLHistory: { Unit: { enum: UNIT_OPTS }, StudentID: { ref: 'students' }, TutorID: { ref: 'tutors' } },
@@ -612,9 +611,9 @@
       { StudentID:'KL06', Name:'Otto Immune',  Gender:'M', Imi:'Y', Resident:'Y', LCMentorID:'T03', ScheduleTag:'ImiGA',           Cohort:'2028' },
     ],
     Tutors: [
-      { TutorID:'T01', Name:'Dr. Cara Diak',     Units:'MD1', Availability:'AM,PM', MaxStudents:6, CoTutorOK:'Y' },
-      { TutorID:'T02', Name:'Dr. Anne Esthesia', Units:'MD1', Availability:'AM',    MaxStudents:6, CoTutorOK:'N' },
-      { TutorID:'T03', Name:'Dr. Hugh Morr',     Units:'MD1', Availability:'PM',    MaxStudents:5, CoTutorOK:'Y' },
+      { TutorID:'T01', Name:'Dr. Cara Diak',     Units:'MD1', Day:'Mon', Start:'09:00', End:'11:00', MaxStudents:6, CoTutorOK:'Y' },
+      { TutorID:'T02', Name:'Dr. Anne Esthesia', Units:'MD1', Day:'Mon', Start:'09:00', End:'11:00', MaxStudents:6, CoTutorOK:'N' },
+      { TutorID:'T03', Name:'Dr. Hugh Morr',     Units:'MD1', Day:'Tue', Start:'13:00', End:'15:00', MaxStudents:5, CoTutorOK:'Y' },
     ],
     Conflicts: [
       { TypeA_ID:'AB01', TypeB_ID:'CD02', Kind:'student-student', Reason:'prior issue' },
@@ -647,17 +646,15 @@
     const gid = n => 'G' + n;
 
     const COHORT = '2028';        // students belong to a class year; groups (units) are not cohort-tied
+    const slot = (g) => ({ day: DAYS[(g - 1) % 5], start: g <= 7 ? '09:00' : '13:00', end: g <= 7 ? '11:00' : '15:00' });
     const Tutors = [];
-    for (let t = 1; t <= G; t++)
+    for (let t = 1; t <= G; t++) { const sl = slot(t);   // each tutor's own meeting day/time
       Tutors.push({ TutorID: tid(t), Name: `Dr. ${firsts[(t * 3) % firsts.length]} ${lasts[(t * 5) % lasts.length]}`,
-                    Units: 'MD2', Availability: t % 2 ? 'AM' : 'PM', MaxStudents: 6, CoTutorOK: t % 3 ? 'Y' : 'N' });
+                    Units: 'MD2', Day: sl.day, Start: sl.start, End: sl.end, MaxStudents: 6, CoTutorOK: t % 3 ? 'Y' : 'N' }); }
     // This unit's slots (MD2): groups spread across Mon–Fri, mornings then afternoons.
     const Groups = [];
-    for (let g = 1; g <= G; g++) {
-      const morning = g <= 7;
-      Groups.push({ Unit: 'MD2', GroupID: gid(g), Day: DAYS[(g - 1) % 5],
-                    Start: morning ? '09:00' : '13:00', End: morning ? '11:00' : '15:00', TutorIDs: tid(g) });
-    }
+    for (let g = 1; g <= G; g++) { const sl = slot(g);
+      Groups.push({ Unit: 'MD2', GroupID: gid(g), Day: sl.day, Start: sl.start, End: sl.end, TutorIDs: tid(g) }); }
 
     const Students = [], PBLHistory = [];
     for (let i = 0; i < N; i++) {
@@ -833,6 +830,9 @@
       if (id) tutorUnits.set(id, new Set(units));
       const badUnits = units.filter(u => !UNITS.includes(u));
       if (badUnits.length) warn(loc, `Units has unknown unit(s): ${badUnits.join(', ')} (use MD1–MD7)`);
+      const day = norm(r.Day), s = timeToMin(r.Start), e = timeToMin(r.End);
+      if (day && !DAYS.includes(day)) warn(loc, `Day should be Mon–Fri (got "${day}")`);
+      if (!isNaN(s) && !isNaN(e) && s >= e) warn(loc, 'End must be after Start');
     });
 
     // Cross-refs: LC mentor must be a known tutor
@@ -1198,8 +1198,22 @@
     view.onclick = (e) => { if (e.target.id === 'schedClear') {
       workbook.Blockouts = (workbook.Blockouts || []).filter(r => norm(r.Subject) !== scheduleSubject);
       renderSchedule(view); refreshValidation(); pushHistory(); } };
-    view.onkeydown = (e) => { if (e.key === ' ' || e.key === 'Enter') { const c = e.target.closest && e.target.closest('.cal-cell');
-      if (c) { e.preventDefault(); paint(c, !c.classList.contains('blocked')); renderSchedule(view); refreshValidation(); pushHistory(); } } };
+    const focusCell = (d, st) => { const c = view.querySelector(`.cal-cell[data-day="${d}"][data-start="${st}"]`); if (c) c.focus(); };
+    view.onkeydown = (e) => {
+      const c = e.target.closest && e.target.closest('.cal-cell'); if (!c) return;
+      const d = c.dataset.day, st = c.dataset.start, di = DAYS.indexOf(d), hi = HOURS.indexOf(st);
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault(); paint(c, !c.classList.contains('blocked'));
+        renderSchedule(view); refreshValidation(); pushHistory(); focusCell(d, st); return;
+      }
+      let nd = di, nh = hi;
+      if (e.key === 'ArrowLeft') nd = Math.max(0, di - 1);
+      else if (e.key === 'ArrowRight') nd = Math.min(DAYS.length - 1, di + 1);
+      else if (e.key === 'ArrowUp') nh = Math.max(0, hi - 1);
+      else if (e.key === 'ArrowDown') nh = Math.min(HOURS.length - 2, hi + 1);
+      else return;
+      e.preventDefault(); focusCell(DAYS[nd], HOURS[nh]);
+    };
   }
 
   function addRow() {
@@ -1321,8 +1335,8 @@
       const units = splitIds(t.Units).map(x => x.toUpperCase());
       if (units.length && !units.includes(u)) return;          // tutor not assigned to this unit
       const n = Number(t.MaxStudents);
-      // Auto-built groups are time-less (no Day/Start/End) → block-outs don't constrain them.
-      out.push({ GroupID: 'G' + (out.length + 1), day: '', start: NaN, end: NaN,
+      // Auto-built groups take the tutor's own meeting day/time, so block-outs apply to them too.
+      out.push({ GroupID: 'G' + (out.length + 1), day: norm(t.Day), start: timeToMin(t.Start), end: timeToMin(t.End),
                  tutors: [tid], capacity: isFinite(n) && n > 0 ? n : 6 });
     });
     return out;

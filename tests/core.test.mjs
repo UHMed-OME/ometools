@@ -208,4 +208,26 @@ assert.equal(us.violations.length, 0, 'unit-blockout case solves cleanly');
 assert.equal(us.groups.find(g => g.GroupID === 'G2').students.length, 0, 'unit block-out empties the overlapping group for everyone');
 console.log('✓ unit block-out empties the overlapping group for the whole unit');
 
+// --- Test 13: auto-built groups take the tutor's time and respect block-outs ---
+const autoSched = {
+  Students: [
+    { StudentID:'A', Name:'A', Gender:'F', Imi:'N', Resident:'Y', LCMentorID:'', ScheduleTag:'', Cohort:'2028' },
+    { StudentID:'B', Name:'B', Gender:'M', Imi:'N', Resident:'Y', LCMentorID:'', ScheduleTag:'', Cohort:'2028' },
+  ],
+  Tutors: [
+    { TutorID:'TA', Name:'A', Units:'MD1', Day:'Mon', Start:'09:00', End:'11:00', MaxStudents:6, CoTutorOK:'Y' },
+    { TutorID:'TB', Name:'B', Units:'MD1', Day:'Tue', Start:'09:00', End:'11:00', MaxStudents:6, CoTutorOK:'Y' },
+  ],
+  Conflicts: [], Groups: [],                                   // no Groups → auto-build one per tutor
+  Blockouts: [{ Subject:'MD1', Day:'Mon', Start:'09:00', End:'11:00' }],   // course blocks TA's slot
+  PBLHistory: [],
+};
+const asol = app.solve(autoSched, 'MD1', app.defaultWeights());
+assert.equal(asol.groups.length, 2, 'auto-builds one group per tutor (no Groups sheet)');
+assert.ok(asol.groups.every(g => g.day), 'auto-built groups carry the tutor\'s meeting day');
+const monG = asol.groups.find(g => g.day === 'Mon');
+assert.equal(monG.students.length, 0, 'a unit block-out empties the auto-built group at the blocked time');
+assert.equal(asol.violations.length, 0, 'the other auto-built group seats everyone cleanly');
+console.log('✓ auto-built groups take tutor times and honor block-outs (Groups sheet optional)');
+
 console.log('\nALL TESTS PASSED');
