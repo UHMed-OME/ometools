@@ -50,7 +50,8 @@ const sandbox = {
   alert(){}, confirm(){ return true }, setTimeout: () => 0, clearTimeout(){}, console, globalThis: null,
 };
 sandbox.globalThis = sandbox;
-const src = m[1] + '\n;globalThis.__app = { solve, renderResult, exportWorkbook, makeExample, defaultWeights };';
+const src = m[1] + '\n;globalThis.__app = { solve, renderResult, exportWorkbook, makeExample, defaultWeights,' +
+  ' showSchedule: () => { activeTab = "Blockouts"; renderSheet(); } };';
 vm.createContext(sandbox);
 
 // --- 3. Loading the app (auto-load → full render) must not throw -----------
@@ -65,5 +66,9 @@ console.log('✓ solve → renderResult (board) runs without throwing');
 const wb = app.exportWorkbook();
 assert.ok(wb && wb.SheetNames && wb.SheetNames.length, 'exportWorkbook produces a workbook');
 console.log('✓ exportWorkbook builds a workbook');
+
+// --- 5. The Schedule calendar tab renders without throwing -----------------
+app.showSchedule();
+console.log('✓ Schedule calendar tab renders without throwing');
 
 console.log('\nALL DOM TESTS PASSED');

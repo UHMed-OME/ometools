@@ -136,6 +136,20 @@
     .filter-bar label { font-weight: 600; font-size: 0.92rem; }
     .filter-bar select { font: inherit; padding: 0.4rem 0.55rem; border: 1px solid var(--line);
       border-radius: 6px; background: var(--bg); color: var(--fg); }
+    /* Schedule week calendar (block-out editor) */
+    .cal-bar { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; padding: 0.6rem 0; }
+    .cal-bar select { font: inherit; padding: 0.4rem 0.55rem; border: 1px solid var(--line);
+      border-radius: 6px; background: var(--bg); color: var(--fg); }
+    .cal-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 8px; width: fit-content; max-width: 100%; }
+    table.cal { border-collapse: collapse; }
+    table.cal th, table.cal td { border: 1px solid var(--line); }
+    table.cal th { background: var(--surface); font-weight: 700; color: var(--brand-dark); font-size: 0.85rem; padding: 0.4rem 0.7rem; }
+    table.cal th.cal-h { font-weight: 400; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    td.cal-cell { width: 64px; height: 30px; cursor: pointer; }
+    td.cal-cell:hover { background: var(--accent-bg); }
+    td.cal-cell.blocked { background: var(--err); }
+    td.cal-cell.blocked:hover { filter: brightness(1.1); }
+    td.cal-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
     /* Shrink the bordered box to the table so it's left-aligned and compact, not full-width. */
     .sheet-wrap { overflow: auto; border: 1px solid var(--line); border-top: none; border-radius: 0 0 8px 8px;
       width: fit-content; max-width: 100%; }
@@ -483,14 +497,22 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     Conflicts:{ key: null, essential: ['TypeA_ID', 'TypeB_ID', 'Kind'],
       required: ['TypeA_ID', 'TypeB_ID', 'Kind', 'Reason'] },
     Groups:   { key: null, essential: ['Unit', 'GroupID'],
-      required: ['Unit', 'GroupID', 'TimeSlot', 'TutorIDs'] },
+      required: ['Unit', 'GroupID', 'Day', 'Start', 'End', 'TutorIDs'] },
+    // Weekly block-out times (the Schedule tab edits this). One row per blocked hour.
+    // `Subject` is a role (e.g. ImiGA, HOMEmgr) OR a unit (MD1–MD7, for a known course time).
+    Blockouts: { key: null, essential: [],
+      required: ['Subject', 'Day', 'Start', 'End'] },
     // NOTE: Excel reserves the worksheet name "History" (change-tracking),
     // so the spec's "History" sheet is stored as "PBLHistory" — same columns.
     PBLHistory: { key: null, essential: [],
       required: ['Unit', 'StudentID', 'GroupID', 'TutorID'] },
   };
-  const SHEET_ORDER = ['Students', 'Tutors', 'Conflicts', 'Groups', 'PBLHistory'];
+  const SHEET_ORDER = ['Students', 'Tutors', 'Conflicts', 'Groups', 'Blockouts', 'PBLHistory'];
   const UNITS = ['MD1','MD2','MD3','MD4','MD5','MD6','MD7'];
+  // Weekly schedule grid (clock times replace the old AM/PM model).
+  const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  const HOURS = []; for (let h = 8; h <= 18; h++) HOURS.push((h < 10 ? '0' : '') + h + ':00');
+  const timeToMin = (t) => { const m = /^(\d{1,2}):(\d{2})$/.exec(norm(t)); return m ? (+m[1]) * 60 + (+m[2]) : NaN; };
   const YN = new Set(['Y', 'N', '']);
   // Columns rendered as a Y/N toggle in the inline editor.
   const BOOL_COLS = new Set(['Imi', 'Resident', 'CoTutorOK']);
@@ -498,10 +520,8 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   // ScheduleTag preset menu (spec §2: ImiGA, HOMEmgr, Exception:Day-Slot, or blank).
   // Rendered as a dropdown in the editor instead of free text; "Custom…" falls back
   // to a text box for anything not in this list.
-  const SCHED_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-  const SCHED_SLOTS = ['AM', 'PM'];
-  const SCHEDULE_TAGS = ['', 'ImiGA', 'HOMEmgr',
-    ...SCHED_DAYS.flatMap(d => SCHED_SLOTS.map(s => `Exception:${d}-${s}`))];
+  // ScheduleTag is the student's special role; its block-out times live on the Schedule tab.
+  const SCHEDULE_TAGS = ['', 'ImiGA', 'HOMEmgr'];
   const CUSTOM_TAG = '__custom__';
   // Class year (cohort) is a graduating year picked from a fixed range (plus any already present).
   const COHORT_MIN_YEAR = 2024, COHORT_MAX_YEAR = 2046;
@@ -520,7 +540,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   // those in the data and only map to plain-English titles when rendering.
   const SHEET_LABELS = {
     Students: 'Students', Tutors: 'Tutors', Conflicts: 'Conflicts',
-    Groups: 'Groups', PBLHistory: 'History',
+    Groups: 'Groups', Blockouts: 'Schedule', PBLHistory: 'History',
   };
   const COLUMN_LABELS = {
     StudentID: 'Student ID', TutorID: 'Tutor ID', Name: 'Name', Gender: 'Gender',
@@ -528,9 +548,8 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     ScheduleTag: 'Schedule', Availability: 'Availability', MaxStudents: 'Max Students',
     CoTutorOK: 'Co-Tutor OK', Units: 'Units', TypeA_ID: 'Person A', TypeB_ID: 'Person B',
     Kind: 'Conflict Type', Reason: 'Reason', Unit: 'Unit', GroupID: 'Group',
-    TimeSlot: 'Time Slot', TutorIDs: 'Tutor(s)', Cohort: 'Class Year',
+    Day: 'Day', Start: 'Start', End: 'End', TutorIDs: 'Tutor(s)', Cohort: 'Class Year', Subject: 'Subject',
   };
-  const FULL_DAYS = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday' };
   const TAG_LABELS = { '': '— none —', ImiGA: 'Imi Hoʻōla GA', HOMEmgr: 'HOME Project Manager' };
   const GENDER_LABELS = { F: 'Female', M: 'Male', X: 'Other' };
 
@@ -539,13 +558,11 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   // Friendly group name for display only (data keeps the canonical GroupID like "G1").
   const groupLabel = (gid) => { const m = /^G\s*0*(\d+)$/i.exec(norm(gid)); return m ? `Group ${m[1]}` : norm(gid); };
   const genderLabel = (g) => GENDER_LABELS[up(g)] || norm(g);
-  function tagLabel(tag) {
-    const t = norm(tag);
-    if (t in TAG_LABELS) return TAG_LABELS[t];
-    const m = /^Exception:(\w+)-(AM|PM)$/i.exec(t);
-    if (m) return `Exception — ${FULL_DAYS[m[1]] || m[1]} (${m[2].toUpperCase()})`;
-    return t;
-  }
+  const tagLabel = (tag) => { const t = norm(tag); return (t in TAG_LABELS) ? TAG_LABELS[t] : t; };
+  // "Mon · 9:00–11:00" for a group's meeting time (display).
+  const slotLabel = (g) => { const d = norm(g.Day || g.day), s = norm(g.Start || (g.start != null ? minToTime(g.start) : '')),
+    e = norm(g.End || (g.end != null ? minToTime(g.end) : '')); return (d || s) ? `${d ? d + ' · ' : ''}${s}${s && e ? '–' + e : ''}` : '—'; };
+  const minToTime = (m) => (m == null || isNaN(m)) ? '' : `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
 
   // ---- Pick-lists: keep solver input sanitized + human-readable -----------
   // Static enums (canonical value stored; human label shown), scoped per sheet
@@ -554,14 +571,15 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   const AVAIL_OPTS    = [{ value:'AM', label:'Mornings (AM)' }, { value:'PM', label:'Afternoons (PM)' }, { value:'AM,PM', label:'Mornings & Afternoons (AM, PM)' }];
   const MAXSTU_OPTS   = [4,5,6,7,8].map(n => ({ value:String(n), label:`${n} students` }));
   const KIND_OPTS     = [{ value:'student-student', label:'Student ↔ Student' }, { value:'tutor-student', label:'Tutor ↔ Student' }];
-  const TIMESLOT_OPTS = [{ value:'AM', label:'Morning (AM)' }, { value:'PM', label:'Afternoon (PM)' }];
   const UNIT_OPTS     = UNITS.map(u => ({ value:u, label:u }));
+  const DAY_OPTS      = DAYS.map(d => ({ value:d, label:d }));
+  const HOUR_OPTS     = HOURS.map(h => ({ value:h, label:h }));
   // Per-(sheet, column) field kinds: `enum` = static list, `ref` = pick a record by name.
   const FIELD_KINDS = {
     Students:   { Gender: { enum: GENDER_OPTS }, LCMentorID: { ref: 'tutors' } },
     Tutors:     { Availability: { enum: AVAIL_OPTS }, MaxStudents: { enum: MAXSTU_OPTS } },
     Conflicts:  { Kind: { enum: KIND_OPTS }, TypeA_ID: { ref: 'people' }, TypeB_ID: { ref: 'people' } },
-    Groups:     { Unit: { enum: UNIT_OPTS }, TimeSlot: { enum: TIMESLOT_OPTS } },
+    Groups:     { Unit: { enum: UNIT_OPTS }, Day: { enum: DAY_OPTS }, Start: { enum: HOUR_OPTS }, End: { enum: HOUR_OPTS } },
     PBLHistory: { Unit: { enum: UNIT_OPTS }, StudentID: { ref: 'students' }, TutorID: { ref: 'tutors' } },
   };
 
@@ -607,7 +625,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
       { StudentID:'CD02', Name:'Hema Globin',  Gender:'M', Imi:'Y', Resident:'Y', LCMentorID:'T02', ScheduleTag:'',                Cohort:'2028' },
       { StudentID:'EF03', Name:'Sara Tonin',   Gender:'F', Imi:'N', Resident:'N', LCMentorID:'T01', ScheduleTag:'',                Cohort:'2028' },
       { StudentID:'GH04', Name:'Gil Bladder',  Gender:'M', Imi:'N', Resident:'Y', LCMentorID:'T03', ScheduleTag:'',                Cohort:'2028' },
-      { StudentID:'IJ05', Name:'Vena Cava',    Gender:'F', Imi:'N', Resident:'N', LCMentorID:'T01', ScheduleTag:'Exception:Tue-AM', Cohort:'2028' },
+      { StudentID:'IJ05', Name:'Vena Cava',    Gender:'F', Imi:'N', Resident:'N', LCMentorID:'T01', ScheduleTag:'',      Cohort:'2028' },
       { StudentID:'KL06', Name:'Otto Immune',  Gender:'M', Imi:'Y', Resident:'Y', LCMentorID:'T03', ScheduleTag:'ImiGA',           Cohort:'2028' },
     ],
     Tutors: [
@@ -620,8 +638,11 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
       { TypeA_ID:'T02',  TypeB_ID:'EF03', Kind:'tutor-student',   Reason:'family' },
     ],
     Groups: [
-      { Unit:'MD1', GroupID:'G1', TimeSlot:'AM', TutorIDs:'T02' },
-      { Unit:'MD1', GroupID:'G2', TimeSlot:'PM', TutorIDs:'T03' },
+      { Unit:'MD1', GroupID:'G1', Day:'Mon', Start:'09:00', End:'11:00', TutorIDs:'T02' },
+      { Unit:'MD1', GroupID:'G2', Day:'Tue', Start:'13:00', End:'15:00', TutorIDs:'T03' },
+    ],
+    Blockouts: [
+      { Subject:'ImiGA', Day:'Wed', Start:'09:00', End:'10:00' },
     ],
     PBLHistory: [
       { Unit:'MD1', StudentID:'AB01', GroupID:'G1', TutorID:'T02' },
@@ -647,17 +668,20 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     for (let t = 1; t <= G; t++)
       Tutors.push({ TutorID: tid(t), Name: `Dr. ${firsts[(t * 3) % firsts.length]} ${lasts[(t * 5) % lasts.length]}`,
                     Units: 'MD2', Availability: t % 2 ? 'AM' : 'PM', MaxStudents: 6, CoTutorOK: t % 3 ? 'Y' : 'N' });
-    // This unit's slots (MD2): groups alternate AM/PM, tutor g covers group g.
+    // This unit's slots (MD2): groups spread across Mon–Fri, mornings then afternoons.
     const Groups = [];
-    for (let g = 1; g <= G; g++)
-      Groups.push({ Unit: 'MD2', GroupID: gid(g), TimeSlot: g % 2 ? 'AM' : 'PM', TutorIDs: tid(g) });
+    for (let g = 1; g <= G; g++) {
+      const morning = g <= 7;
+      Groups.push({ Unit: 'MD2', GroupID: gid(g), Day: DAYS[(g - 1) % 5],
+                    Start: morning ? '09:00' : '13:00', End: morning ? '11:00' : '15:00', TutorIDs: tid(g) });
+    }
 
     const Students = [], PBLHistory = [];
     for (let i = 0; i < N; i++) {
       const id = sid(i + 1);
       let tag = '';
-      if (i % 23 === 0 && i) tag = 'Exception:Tue-AM';   // a few AM-bound students
-      else if (i % 19 === 0 && i) tag = 'ImiGA';          // informational
+      if (i % 19 === 0 && i) tag = 'ImiGA';
+      else if (i % 17 === 0 && i) tag = 'HOMEmgr';
       Students.push({
         StudentID: id, Name: `${firsts[i % firsts.length]} ${lasts[(i * 7 + 3) % lasts.length]}`,
         Gender: i % 2 ? 'M' : 'F',
@@ -675,7 +699,12 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
       { TypeA_ID: sid(3), TypeB_ID: sid(4),  Kind: 'student-student', Reason: 'roommates' },
       { TypeA_ID: tid(2), TypeB_ID: sid(6),  Kind: 'tutor-student',   Reason: 'family' },
     ];
-    return { Students, Tutors, Conflicts, Groups, PBLHistory };
+    // Role block-outs: those roles' students avoid groups meeting at these times.
+    const Blockouts = [
+      { Subject: 'ImiGA',   Day: 'Mon', Start: '09:00', End: '11:00' },
+      { Subject: 'HOMEmgr', Day: 'Tue', Start: '13:00', End: '15:00' },
+    ];
+    return { Students, Tutors, Conflicts, Groups, Blockouts, PBLHistory };
   }
 
   // ---- State -------------------------------------------------------------
@@ -777,7 +806,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
       const rows = wb[name];
       if (!rows) {
         // History/Conflicts may legitimately be empty on a fresh cohort.
-        if (name === 'PBLHistory' || name === 'Conflicts') warn(name, 'sheet missing — treated as empty');
+        if (name === 'PBLHistory' || name === 'Conflicts' || name === 'Blockouts') warn(name, 'sheet missing — treated as empty');
         else err(name, 'required sheet is missing');
         continue;
       }
@@ -854,6 +883,11 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
       const unit = norm(r.Unit);
       if (!UNITS.includes(unit)) err(loc, `Unit must be one of MD1–MD7 (got "${unit}")`, 'Groups', i);
       if (!norm(r.GroupID)) err(loc, 'blank GroupID', 'Groups', i);
+      const day = norm(r.Day), s = timeToMin(r.Start), e = timeToMin(r.End);
+      if (day && !DAYS.includes(day)) warn(loc, `Day should be Mon–Fri (got "${day}")`);
+      if (norm(r.Start) && isNaN(s)) warn(loc, `Start should be a time like 09:00 (got "${norm(r.Start)}")`);
+      if (norm(r.End) && isNaN(e)) warn(loc, `End should be a time like 11:00 (got "${norm(r.End)}")`);
+      if (!isNaN(s) && !isNaN(e) && s >= e) warn(loc, 'End must be after Start');
       const tids = splitIds(r.TutorIDs);
       if (!tids.length) warn(loc, 'no TutorIDs listed');
       tids.forEach(t => {
@@ -861,6 +895,16 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
         const tu = tutorUnits.get(t);   // advisory: tutor assigned to a unit they don't list
         if (tu && tu.size && !tu.has(unit.toUpperCase())) warn(loc, `tutor ${t} isn't listed for ${unit} (check their Units)`);
       });
+    });
+
+    // Block-outs (Schedule): Subject required; Day/times sane (warnings — advisory data).
+    (wb.Blockouts || []).forEach((r, i) => {
+      const loc = `Schedule row ${i + 2}`;
+      if (!norm(r.Subject)) { err(loc, 'blank Subject (a role or unit)', 'Blockouts', i); return; }
+      const day = norm(r.Day), s = timeToMin(r.Start), e = timeToMin(r.End);
+      if (!DAYS.includes(day)) warn(loc, `Day should be Mon–Fri (got "${day}")`);
+      if (isNaN(s) || isNaN(e)) warn(loc, 'Start/End should be times like 09:00');
+      else if (s >= e) warn(loc, 'End must be after Start');
     });
 
     // PBLHistory (referential integrity; missing refs are warnings, not blockers)
@@ -878,6 +922,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   let editorOpen = true;         // is the spreadsheet editor expanded under the summary card?
   let lastValidation = null;     // most recent validate() result, for the summary card
   let rosterFilter = '';         // view/edit one class at a time ('' = all classes)
+  let scheduleSubject = 'ImiGA'; // which subject's block-outs the Schedule calendar is editing
 
   // Class filter for the roster editor (only meaningful with 2+ cohorts).
   function renderRosterFilter() {
@@ -955,6 +1000,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   // and rows can be added/removed. Edits write straight back into `workbook`.
   function renderSheet() {
     const view = $('sheetView'); view.classList.remove('hidden');
+    if (activeTab === 'Blockouts') { renderSchedule(view); return; }   // the Schedule tab → week calendar
     const sheet = activeTab;
     const rows = workbook[sheet] || (workbook[sheet] = []);
     const cols = SCHEMA[sheet] ? SCHEMA[sheet].required : (rows[0] ? Object.keys(rows[0]) : []);
@@ -1058,6 +1104,62 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     };
   }
 
+  // ---- Schedule calendar (edits the Blockouts sheet) ---------------------
+  // Subjects to block out: special roles (presets + any in the data) and the units MD1–MD7.
+  function scheduleSubjects() {
+    const roleSet = new Set(['ImiGA', 'HOMEmgr']);
+    (workbook.Students || []).forEach(s => { const t = norm(s.ScheduleTag); if (t && !UNITS.includes(t)) roleSet.add(t); });
+    (workbook.Blockouts || []).forEach(r => { const x = norm(r.Subject); if (x && !UNITS.includes(x)) roleSet.add(x); });
+    return [...[...roleSet].sort().map(r => ({ value: r, label: tagLabel(r) || r, group: 'Role' })),
+            ...UNITS.map(u => ({ value: u, label: u, group: 'Unit' }))];
+  }
+  // Hour cells (`day|HH:00`) blocked for a subject (covers multi-hour imported ranges too).
+  function blockedCells(subject) {
+    const set = new Set();
+    (workbook.Blockouts || []).forEach(r => {
+      if (norm(r.Subject) !== subject) return;
+      const day = norm(r.Day), s = timeToMin(r.Start), e = timeToMin(r.End);
+      if (!day || isNaN(s) || isNaN(e)) return;
+      HOURS.slice(0, -1).forEach((h, hi) => { const cs = timeToMin(h), ce = timeToMin(HOURS[hi + 1]); if (cs < e && s < ce) set.add(day + '|' + h); });
+    });
+    return set;
+  }
+  // Set/clear one hour cell by rebuilding this subject+day's rows from the covered hour set.
+  function setBlock(subject, day, start, on) {
+    workbook.Blockouts = workbook.Blockouts || [];
+    const covered = new Set();
+    workbook.Blockouts.forEach(r => {
+      if (norm(r.Subject) !== subject || norm(r.Day) !== day) return;
+      const s = timeToMin(r.Start), e = timeToMin(r.End);
+      HOURS.slice(0, -1).forEach(h => { const hs = timeToMin(h); if (!isNaN(s) && !isNaN(e) && hs >= s && hs < e) covered.add(h); });
+    });
+    on ? covered.add(start) : covered.delete(start);
+    workbook.Blockouts = workbook.Blockouts.filter(r => !(norm(r.Subject) === subject && norm(r.Day) === day));
+    [...covered].sort((a, b) => timeToMin(a) - timeToMin(b)).forEach(h =>
+      workbook.Blockouts.push({ Subject: subject, Day: day, Start: h, End: HOURS[HOURS.indexOf(h) + 1] }));
+  }
+  function renderSchedule(view) {
+    const subs = scheduleSubjects();
+    if (!subs.some(o => o.value === scheduleSubject)) scheduleSubject = subs.length ? subs[0].value : '';
+    const optsOf = grp => subs.filter(o => o.group === grp).map(o => optionTag(o.value, o.label, o.value === scheduleSubject)).join('');
+    const blocked = blockedCells(scheduleSubject);
+    const head = `<tr><th></th>${DAYS.map(d => `<th>${d}</th>`).join('')}</tr>`;
+    const body = HOURS.slice(0, -1).map((h, hi) => `<tr><th class="cal-h">${h}</th>` +
+      DAYS.map(d => { const on = blocked.has(d + '|' + h);
+        return `<td class="cal-cell${on ? ' blocked' : ''}" data-day="${d}" data-start="${h}" role="button" tabindex="0" aria-pressed="${on}" aria-label="${d} ${h}${on ? ', blocked' : ''}"></td>`;
+      }).join('') + `</tr>`).join('');
+    view.innerHTML =
+      `<div class="cal-bar"><label>Block out times for&nbsp;<select id="schedSubject">` +
+        `<optgroup label="Roles">${optsOf('Role')}</optgroup><optgroup label="Units">${optsOf('Unit')}</optgroup></select></label>` +
+      `<span class="hint" style="margin:0">Click cells to block/unblock. A role's blocks keep that role's students out of overlapping groups; a unit's blocks keep everyone in that unit out.</span></div>` +
+      `<div class="cal-wrap"><table class="cal">${head}${body}</table></div>`;
+    view.onchange = (e) => { if (e.target.id === 'schedSubject') { scheduleSubject = e.target.value; renderSchedule(view); } };
+    const toggle = (c) => { if (!c) return; setBlock(scheduleSubject, c.dataset.day, c.dataset.start, !c.classList.contains('blocked'));
+      renderSchedule(view); refreshValidation(); pushHistory(); };
+    view.onclick = (e) => { const c = e.target.closest && e.target.closest('.cal-cell'); if (c) toggle(c); };
+    view.onkeydown = (e) => { if (e.key === ' ' || e.key === 'Enter') { const c = e.target.closest && e.target.closest('.cal-cell'); if (c) { e.preventDefault(); toggle(c); } } };
+  }
+
   function addRow() {
     const cols = SCHEMA[activeTab] ? SCHEMA[activeTab].required : [];
     const blank = {}; cols.forEach(c => blank[c] = '');
@@ -1124,7 +1226,15 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
       if (kind === 'student-student') ssConf.add(pairKey(a, b));
       else if (kind === 'tutor-student') tsConf.add((tutorsById.has(a) ? a + '|' + b : b + '|' + a));
     });
-    return { studentsById, tutorsById, ssConf, tsConf, history: wb.PBLHistory || [] };
+    // Block-outs by subject (a role like ImiGA/HOMEmgr, or a unit MD1–MD7) → [{day, start, end}] in minutes.
+    const blocks = new Map();
+    (wb.Blockouts || []).forEach(r => {
+      const subj = norm(r.Subject), day = norm(r.Day), s = timeToMin(r.Start), e = timeToMin(r.End);
+      if (!subj || !day || isNaN(s) || isNaN(e) || s >= e) return;
+      if (!blocks.has(subj)) blocks.set(subj, []);
+      blocks.get(subj).push({ day, start: s, end: e });
+    });
+    return { studentsById, tutorsById, ssConf, tsConf, blocks, history: wb.PBLHistory || [] };
   }
 
   // Prior-unit data for repeat avoidance (excludes the unit being solved, so re-solving
@@ -1153,13 +1263,14 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   // single AM/PM; blank if they cover both), capacity from Max Students. So creating the Groups
   // sheet is optional — it only overrides this default.
   function groupsForUnit(wb, unit, tutorsById) {
+    const mk = (GroupID, g, tutors, capacity) =>
+      ({ GroupID, day: norm(g.Day), start: timeToMin(g.Start), end: timeToMin(g.End), tutors, capacity });
     const defined = (wb.Groups || []).filter(g => norm(g.Unit) === unit);
     if (defined.length) return defined.map((g) => {
       const tutors = splitIds(g.TutorIDs);
       const caps = tutors.map(t => { const tt = tutorsById.get(t); const n = tt ? Number(tt.MaxStudents) : NaN;
                                      return isFinite(n) && n > 0 ? n : 6; });
-      return { GroupID: norm(g.GroupID), TimeSlot: norm(g.TimeSlot), tutors,
-               capacity: caps.length ? Math.min(...caps) : 6 };
+      return mk(norm(g.GroupID), g, tutors, caps.length ? Math.min(...caps) : 6);
     });
     const u = unit.toUpperCase();
     const out = [];
@@ -1167,22 +1278,23 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
       const tid = norm(t.TutorID); if (!tid) return;
       const units = splitIds(t.Units).map(x => x.toUpperCase());
       if (units.length && !units.includes(u)) return;          // tutor not assigned to this unit
-      const avail = splitIds(t.Availability).map(x => x.toUpperCase());
       const n = Number(t.MaxStudents);
-      out.push({ GroupID: 'G' + (out.length + 1), TimeSlot: avail.length === 1 ? avail[0] : '',
+      // Auto-built groups are time-less (no Day/Start/End) → block-outs don't constrain them.
+      out.push({ GroupID: 'G' + (out.length + 1), day: '', start: NaN, end: NaN,
                  tutors: [tid], capacity: isFinite(n) && n > 0 ? n : 6 });
     });
     return out;
   }
 
-  // Schedule fit (spec §3.4, open question §7.5): `Exception:<Day>-AM/PM` binds the student
-  // to a group whose TimeSlot matches that AM/PM; other tags (Imi Hoʻōla GA, HOME Project
-  // Manager, custom) are treated as informational, not a hard constraint. Easy to tighten here.
-  function scheduleFits(student, group) {
-    const tag = norm(student.ScheduleTag);
-    if (!tag) return true;
-    const m = /^exception:\w+-(AM|PM)$/i.exec(tag);
-    if (m) return up(group.TimeSlot) === m[1].toUpperCase();
+  // Schedule fit: a student can't be in a group whose meeting time overlaps a block-out for
+  // their role (ScheduleTag) OR for the unit being solved (a known course time). A group with
+  // no meeting time has no constraint. `idx.blocks` = Map(subject → [{day,start,end}]); `idx.unit`.
+  function scheduleFits(student, group, idx) {
+    if (!group.day || isNaN(group.start) || isNaN(group.end)) return true;
+    const blocks = idx.blocks || new Map();
+    const ranges = (blocks.get(norm(student.ScheduleTag)) || []).concat(blocks.get(idx.unit) || []);
+    for (const b of ranges)
+      if (b.day === group.day && b.start < group.end && group.start < b.end) return false;
     return true;
   }
 
@@ -1195,7 +1307,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     for (const t of group.tutors) if (idx.tsConf.has(t + '|' + sid)) return { rule: 'Tutor–student conflict', detail: `conflicts with tutor ${t}` };
     const pt = idx.prior.priorTutors.get(sid);
     if (pt) for (const t of group.tutors) if (pt.has(t)) return { rule: 'No repeat tutor', detail: `had tutor ${t} in a prior unit` };
-    if (!scheduleFits(student, group)) return { rule: 'Schedule fit', detail: `schedule ${norm(student.ScheduleTag)} can't use ${group.GroupID} (${group.TimeSlot})` };
+    if (!scheduleFits(student, group, idx)) return { rule: 'Schedule fit', detail: `a block-out overlaps ${group.GroupID} (${slotLabel(group)})` };
     return null;
   }
   // Student–student conflict with the current members of a group.
@@ -1331,10 +1443,9 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   function verifyHard(outGroups, idx) {
     const tally = { 'No repeat tutor': 0, 'Schedule fit': 0, 'LC mentor ≠ tutor': 0 };
     outGroups.forEach(g => {
-      const group = { GroupID: g.GroupID, TimeSlot: g.TimeSlot, tutors: g.tutors, capacity: g.capacity };
       g.students.forEach(sid => {
         const s = idx.studentsById.get(sid); if (!s) return;
-        const sv = staticViolation(s, group, idx);
+        const sv = staticViolation(s, g, idx);   // g already carries GroupID/day/start/end/tutors
         if (sv && tally[sv.rule] != null) tally[sv.rule]++;
       });
     });
@@ -1348,6 +1459,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     const co = norm(cohort);
     const idx = buildIndex(wb);
     idx.prior = priorData(idx.history, unit);
+    idx.unit = unit;                                          // for unit-level schedule block-outs
     const groups = groupsForUnit(wb, unit, idx.tutorsById);   // all of this unit's slots (any class)
     let students = (wb.Students || []).filter(s => norm(s.StudentID));
     if (co) students = students.filter(s => norm(s.Cohort) === co);   // but only the chosen class's students
@@ -1374,8 +1486,8 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
           (violations.length === bestRun.violations.length && score < bestRun.score))
         bestRun = { assign: opt.assign, violations, score };
     }
-    const outGroups = groups.map((g, gi) => ({ GroupID: g.GroupID, TimeSlot: g.TimeSlot, tutors: g.tutors,
-                                               capacity: g.capacity, students: bestRun.assign[gi].slice() }));
+    const outGroups = groups.map((g, gi) => ({ GroupID: g.GroupID, day: g.day, start: g.start, end: g.end,
+                                               tutors: g.tutors, capacity: g.capacity, students: bestRun.assign[gi].slice() }));
     const metrics = metricsOf(bestRun.assign, groups, idx);
     return { unit, cohort: co, groups: outGroups, violations: bestRun.violations,
              capacityShortfall: Math.max(0, students.length - totalCap),
@@ -1430,14 +1542,14 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     // Live re-validation against the current board state.
     const idx = buildIndex(workbook);
     idx.prior = priorData(idx.history, res.unit);
+    idx.unit = res.unit;
     // Hard-rule breaks (red) are verified; conflicts are advisory warnings (amber), not hard-verified.
     const flags = new Map();   // studentId -> { rule, detail } — hard
     const warns = new Map();   // studentId -> { rule, detail } — conflicts
     res.groups.forEach(g => {
-      const group = { GroupID: g.GroupID, TimeSlot: g.TimeSlot, tutors: g.tutors, capacity: g.capacity };
       g.students.forEach((sid, i) => {
         const s = idx.studentsById.get(sid);
-        const sv = s ? staticViolation(s, group, idx) : null;
+        const sv = s ? staticViolation(s, g, idx) : null;
         const mc = memberConflict(sid, g.students.filter((_, k) => k !== i), idx);
         if (sv && sv.rule === 'Tutor–student conflict') warns.set(sid, sv);
         else if (sv) flags.set(sid, sv);
@@ -1504,7 +1616,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
       const over = g.students.length > g.capacity;
       return `<div class="gcol${over ? ' over' : ''}" data-gi="${gi}"><div class="ghead">` +
         `<div class="gid">${escapeHtml(groupLabel(g.GroupID))}</div>` +
-        `<div class="gmeta">${escapeHtml(g.TimeSlot || '—')} · seats ${g.capacity}</div>` +
+        `<div class="gmeta">${escapeHtml(slotLabel(g))} · seats ${g.capacity}</div>` +
         `<div class="gtutors">${escapeHtml(tnames)}</div>` +
         `<div class="gsummary">${escapeHtml(summary)}</div></div>` +
         `<div class="gbody" data-gi="${gi}">${chips}</div><div class="gcount">${g.students.length} / ${g.capacity}</div></div>`;
@@ -1552,7 +1664,8 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     const results = [], history = [];
     result.groups.forEach(g => {
       g.students.forEach(sid => {
-        results.push({ Unit: unit, Cohort: cohort, GroupID: g.GroupID, TimeSlot: g.TimeSlot,
+        results.push({ Unit: unit, Cohort: cohort, GroupID: g.GroupID,
+          Day: norm(g.day), Start: minToTime(g.start), End: minToTime(g.end),
           TutorIDs: g.tutors.join('; '), TutorNames: g.tutors.map(t => tutorName.get(t) || t).join('; '),
           StudentID: sid, StudentName: studName.get(sid) || sid });
         (g.tutors.length ? g.tutors : ['']).forEach(t =>
@@ -1566,7 +1679,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
       .filter(r => !(norm(r.Unit) === unit && placed.has(norm(r.StudentID)))).concat(history);
     return { results, history: mergedHistory };
   }
-  const RESULTS_COLS = ['Unit', 'Cohort', 'GroupID', 'TimeSlot', 'TutorIDs', 'TutorNames', 'StudentID', 'StudentName'];
+  const RESULTS_COLS = ['Unit', 'Cohort', 'GroupID', 'Day', 'Start', 'End', 'TutorIDs', 'TutorNames', 'StudentID', 'StudentName'];
 
   // Build the export workbook: all canonical sheets (with edits), and — when a clean
   // solve exists — a Results sheet plus this unit's rows appended to PBLHistory.
@@ -1600,7 +1713,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
                       norm(s.ScheduleTag) ? tagLabel(s.ScheduleTag) : ''].filter(Boolean).join(' · ');
         return `<li>${escapeHtml(norm(s.Name) || sid)}${tags ? ` <span class="rtags">— ${escapeHtml(tags)}</span>` : ''}</li>`;
       }).join('');
-      return `<section class="rgroup"><h2>${escapeHtml(groupLabel(g.GroupID))} · ${escapeHtml(g.TimeSlot || '—')} · ${escapeHtml(tut)}` +
+      return `<section class="rgroup"><h2>${escapeHtml(groupLabel(g.GroupID))} · ${escapeHtml(slotLabel(g))} · ${escapeHtml(tut)}` +
              ` <span class="rcount">(${g.students.length})</span></h2><ol>${lis}</ol></section>`;
     }).join('');
     const co = norm(lastResult.cohort);

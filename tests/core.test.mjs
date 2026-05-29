@@ -60,6 +60,7 @@ assert.equal(res.errors.length, 0, 'template should have 0 errors, got: ' +
   JSON.stringify(res.errors));
 assert.equal(reread.Students.length, app.TEMPLATE.Students.length, 'student count preserved');
 assert.equal(reread.Students[0].StudentID, 'AB01', 'student id preserved');
+assert.equal(reread.Blockouts.length, app.TEMPLATE.Blockouts.length, 'Blockouts sheet round-trips');
 console.log('✓ template round-trips losslessly and validates with 0 errors');
 
 // --- Test 2: validation catches deliberately broken data ------------------
@@ -104,16 +105,13 @@ sol.groups.forEach(g => g.students.forEach(id => { assert.ok(!seen.has(id), 'no 
 const groupOf = id => sol.groups.find(g => g.students.includes(id));
 assert.notEqual(groupOf('AB01').GroupID, groupOf('CD02').GroupID, 'student–student conflict AB01/CD02 kept apart');
 assert.ok(!groupOf('IJ05').tutors.includes('T01'), 'IJ05 not tutored by their LC mentor T01');
-assert.equal(groupOf('IJ05').TimeSlot.toUpperCase(), 'AM', 'IJ05 Exception:Tue-AM lands in an AM slot');
 assert.ok(!groupOf('EF03').tutors.includes('T02'), 'tutor–student conflict T02/EF03 respected');
 console.log(`✓ solver placed all ${placed} students, 0 violations, hard rules verified`);
 
 // --- Test 5: over-constrained input is flagged, not silently fudged -------
 const tight = JSON.parse(JSON.stringify(app.TEMPLATE));
-// Force EF03 into an impossible spot: only one AM group, tutored by their own conflict tutor.
-tight.Groups = [{ Unit:'MD1', GroupID:'G1', TimeSlot:'AM', TutorIDs:'T02' }];
-tight.Students = tight.Students.map(s => s.StudentID === 'EF03'
-  ? { ...s, ScheduleTag:'Exception:Tue-AM' } : s);
+// Force a dead-end: the only group is tutored by EF03's conflict tutor T02 (and CD02's LC mentor).
+tight.Groups = [{ Unit:'MD1', GroupID:'G1', Day:'Mon', Start:'09:00', End:'11:00', TutorIDs:'T02' }];
 const tightSol = app.solve(tight, 'MD1', app.defaultWeights());
 assert.ok(tightSol.violations.length > 0, 'over-constrained input surfaces at least one relaxed hard rule');
 console.log(`✓ over-constrained input flagged ${tightSol.violations.length} relaxed rule(s) instead of hiding them`);
@@ -177,5 +175,37 @@ assert.ok(autoSol.groups.every(g => g.tutors.length === 1), 'one tutor per auto-
 assert.equal(autoSol.groups.reduce((n, g) => n + g.students.length, 0), 80, 'all placed via auto-built groups');
 assert.equal(autoSol.violations.length, 0, 'auto-built groups solve cleanly');
 console.log('✓ auto-built groups (no Groups sheet) place all 80 cleanly');
+
+// --- Test 11: a role block-out keeps that role's students out of overlapping groups ---
+const schedWb = {
+  Students: [
+    { StudentID:'P1', Name:'One', Gender:'F', Imi:'N', Resident:'Y', LCMentorID:'', ScheduleTag:'R', Cohort:'2028' },
+    { StudentID:'P2', Name:'Two', Gender:'M', Imi:'N', Resident:'Y', LCMentorID:'', ScheduleTag:'',  Cohort:'2028' },
+  ],
+  Tutors: [
+    { TutorID:'TA', Name:'A', Units:'MD1', MaxStudents:6, CoTutorOK:'Y' },
+    { TutorID:'TB', Name:'B', Units:'MD1', MaxStudents:6, CoTutorOK:'Y' },
+  ],
+  Conflicts: [],
+  Groups: [
+    { Unit:'MD1', GroupID:'G1', Day:'Mon', Start:'09:00', End:'11:00', TutorIDs:'TA' },
+    { Unit:'MD1', GroupID:'G2', Day:'Tue', Start:'09:00', End:'11:00', TutorIDs:'TB' },
+  ],
+  Blockouts: [{ Subject:'R', Day:'Mon', Start:'09:00', End:'11:00' }],   // role R busy Mon 9–11 → can't use G1
+  PBLHistory: [],
+};
+const ss = app.solve(schedWb, 'MD1', app.defaultWeights());
+const gOf = id => (ss.groups.find(g => g.students.includes(id)) || {}).GroupID;
+assert.equal(ss.violations.length, 0, 'role-blockout case solves cleanly');
+assert.equal(gOf('P1'), 'G2', 'role-blocked student avoids the overlapping group (Mon 9–11)');
+console.log('✓ role block-out keeps the role\'s students out of overlapping groups');
+
+// --- Test 12: a unit block-out keeps EVERYONE in that unit out of the overlapping group ---
+const unitWb = JSON.parse(JSON.stringify(schedWb));
+unitWb.Blockouts = [{ Subject:'MD1', Day:'Tue', Start:'09:00', End:'11:00' }];   // a course for MD1, Tue 9–11
+const us = app.solve(unitWb, 'MD1', app.defaultWeights());
+assert.equal(us.violations.length, 0, 'unit-blockout case solves cleanly');
+assert.equal(us.groups.find(g => g.GroupID === 'G2').students.length, 0, 'unit block-out empties the overlapping group for everyone');
+console.log('✓ unit block-out empties the overlapping group for the whole unit');
 
 console.log('\nALL TESTS PASSED');
