@@ -248,4 +248,19 @@ assert.equal(mr.violations.length, 0, 'multi-role case solves cleanly');
 assert.equal(mGroupDay('M1'), 'Mon', 'a second role\'s block-out still keeps the multi-role student out (Tue → Mon)');
 console.log('✓ a student\'s multiple roles are all honored by the schedule rule');
 
+// --- Test 15: a tutor's per-unit time override applies to that unit, default to the others ---
+const ovWb = {
+  Students: [{ StudentID:'X1', Name:'X', Gender:'F', Imi:'N', Resident:'Y', LCMentorID:'', ScheduleTag:'', Cohort:'2028' }],
+  Tutors: [{ TutorID:'TX', Name:'X', Units:'MD2; MD3', Day:'Mon', Start:'09:00', End:'11:00', MaxStudents:6, CoTutorOK:'Y' }],
+  Conflicts: [], Groups: [], Blockouts: [],
+  TutorTimes: [{ TutorID:'TX', Unit:'MD3', Day:'Thu', Start:'13:00', End:'15:00' }],   // override MD3 only
+  PBLHistory: [],
+};
+const md2 = app.solve(ovWb, 'MD2', app.defaultWeights());
+const md3 = app.solve(ovWb, 'MD3', app.defaultWeights());
+assert.equal(md2.groups[0].day, 'Mon', 'MD2 uses the tutor default day (no override)');
+assert.equal(md3.groups[0].day, 'Thu', 'MD3 uses the per-unit override day');
+assert.equal(md2.groups[0].students.length + md3.groups[0].students.length, 2, 'the student places in both unit solves');
+console.log('✓ per-unit tutor time override applies to its unit, default elsewhere');
+
 console.log('\nALL TESTS PASSED');

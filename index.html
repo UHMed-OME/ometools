@@ -245,6 +245,14 @@
     .rolepick-add input { flex: 1; min-width: 0; font: inherit; font-size: 0.85rem; padding: 0.3rem 0.4rem;
       border: 1px solid var(--line); border-radius: 5px; background: var(--surface); color: var(--fg); }
     .rolepick-add button { font-size: 0.82rem; padding: 0.3rem 0.6rem; }
+    /* Tutor Units checklist with per-unit time overrides */
+    .unitpick .rolepick-panel { min-width: 16rem; }
+    .unit-hint { font-size: 0.78rem; padding: 0.1rem 0.3rem 0.35rem; }
+    .unit-line { display: flex; align-items: center; gap: 0.5rem; padding: 0.15rem 0.3rem; flex-wrap: wrap; }
+    .unit-line .rolechk-item { min-width: 3.4rem; }
+    .unit-time { display: inline-flex; gap: 0.25rem; }
+    .unit-time select { font: inherit; font-size: 0.8rem; padding: 0.2rem 0.3rem; border: 1px solid var(--line);
+      border-radius: 5px; background: var(--surface); color: var(--fg); }
     .cal-addrole { display: inline-flex; gap: 0.3rem; align-items: center; }
     .cal-addrole input { font: inherit; font-size: 0.92rem; padding: 0.4rem 0.5rem;
       border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
@@ -538,6 +546,10 @@
     // `Subject` is a role (e.g. ImiGA, HOMEmgr) OR a unit (MD1–MD7, for a known course time).
     Blockouts: { key: null, essential: [],
       required: ['Subject', 'Day', 'Start', 'End'] },
+    // Per-(tutor, unit) meeting-time overrides. A tutor's default time lives on the Tutors row;
+    // a row here overrides it for one unit (edited inline in the tutor's Units checklist). May be empty.
+    TutorTimes: { key: null, essential: [],
+      required: ['TutorID', 'Unit', 'Day', 'Start', 'End'] },
     // NOTE: Excel reserves the worksheet name "History" (change-tracking),
     // so the spec's "History" sheet is stored as "PBLHistory" — same columns.
     PBLHistory: { key: null, essential: [],
@@ -546,7 +558,10 @@
   // Groups are no longer a managed sheet — they're auto-built from each tutor's units + meeting
   // times (see groupsForUnit). SCHEMA.Groups stays so a hand-injected/imported Groups array still
   // round-trips through groupsForUnit's defined-path, but it gets no editor tab and isn't exported.
-  const SHEET_ORDER = ['Students', 'Tutors', 'Conflicts', 'Blockouts', 'PBLHistory'];
+  const SHEET_ORDER = ['Students', 'Tutors', 'Conflicts', 'Blockouts', 'TutorTimes', 'PBLHistory'];
+  // Sheets that round-trip but get no editor tab (edited inline elsewhere): TutorTimes lives in the
+  // tutor's Units checklist, so it's hidden from renderTabs.
+  const HIDDEN_TABS = new Set(['TutorTimes']);
   const UNITS = ['MD1','MD2','MD3','MD4','MD5','MD6','MD7'];
   // Weekly schedule grid (clock times replace the old AM/PM model).
   const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
@@ -577,7 +592,7 @@
   // those in the data and only map to plain-English titles when rendering.
   const SHEET_LABELS = {
     Students: 'Students', Tutors: 'Tutors', Conflicts: 'Conflicts',
-    Groups: 'Groups', Blockouts: 'Schedule', PBLHistory: 'History',
+    Groups: 'Groups', Blockouts: 'Schedule', TutorTimes: 'Tutor Times', PBLHistory: 'History',
   };
   const COLUMN_LABELS = {
     StudentID: 'Student ID', TutorID: 'Tutor ID', Name: 'Name', Gender: 'Gender',
@@ -607,6 +622,19 @@
     (workbook && workbook.Students || []).forEach(s => studentRoles(s.ScheduleTag).forEach(r => { if (!UNITS.includes(r)) set.add(r); }));
     (workbook && workbook.Blockouts || []).forEach(b => { const x = norm(b.Subject); if (x && !UNITS.includes(x)) set.add(x); });
     return [...set].sort();
+  }
+  // Per-(tutor, unit) meeting-time override row, or null. Stored in workbook.TutorTimes.
+  function tutorTimeOverride(tid, unit) {
+    tid = norm(tid); const u = norm(unit).toUpperCase();
+    return (workbook.TutorTimes || []).find(r => norm(r.TutorID) === tid && norm(r.Unit).toUpperCase() === u) || null;
+  }
+  // Upsert/clear a tutor's per-unit override. A complete {Day,Start,End} upserts; anything missing
+  // removes the row (→ fall back to the tutor's default time).
+  function setTutorTime(tid, unit, day, start, end) {
+    tid = norm(tid); const u = norm(unit).toUpperCase();
+    workbook.TutorTimes = (workbook.TutorTimes || []).filter(r => !(norm(r.TutorID) === tid && norm(r.Unit).toUpperCase() === u));
+    if (norm(day) && norm(start) && norm(end))
+      workbook.TutorTimes.push({ TutorID: tid, Unit: u, Day: norm(day), Start: norm(start), End: norm(end) });
   }
   // "Mon · 9:00–11:00" for a group's meeting time (display).
   const slotLabel = (g) => { const d = norm(g.Day || g.day), s = norm(g.Start || (g.start != null ? minToTime(g.start) : '')),
@@ -688,6 +716,7 @@
     Blockouts: [
       { Subject:'ImiGA', Day:'Wed', Start:'09:00', End:'10:00' },
     ],
+    TutorTimes: [],
     PBLHistory: [
       { Unit:'MD1', StudentID:'AB01', GroupID:'G1', TutorID:'T02' },
     ],
@@ -743,7 +772,7 @@
       { Subject: 'ImiGA',   Day: 'Mon', Start: '09:00', End: '11:00' },
       { Subject: 'HOMEmgr', Day: 'Tue', Start: '13:00', End: '15:00' },
     ];
-    return { Students, Tutors, Conflicts, Blockouts, PBLHistory };
+    return { Students, Tutors, Conflicts, Blockouts, TutorTimes: [], PBLHistory };
   }
 
   // ---- State -------------------------------------------------------------
@@ -894,6 +923,17 @@
       if (!isNaN(s) && !isNaN(e) && s >= e) warn(loc, 'End must be after Start');
     });
 
+    // Per-unit tutor time overrides (TutorTimes): light sanity, advisory only.
+    (wb.TutorTimes || []).forEach((r, i) => {
+      const loc = `Tutor Times row ${i + 2}`;
+      const tid = norm(r.TutorID), un = norm(r.Unit).toUpperCase();
+      if (tid && !tutorIds.has(tid)) warn(loc, `TutorID "${tid}" is not in the Tutors sheet`);
+      if (un && !UNITS.includes(un)) warn(loc, `Unit should be MD1–MD7 (got "${norm(r.Unit)}")`);
+      const s = timeToMin(r.Start), e = timeToMin(r.End);
+      if (norm(r.Day) && !DAYS.includes(norm(r.Day))) warn(loc, `Day should be Mon–Fri (got "${norm(r.Day)}")`);
+      if (!isNaN(s) && !isNaN(e) && s >= e) warn(loc, 'End must be after Start');
+    });
+
     // Cross-refs: LC mentor must be a known tutor
     students.forEach((r, i) => {
       const m = norm(r.LCMentorID);
@@ -1020,6 +1060,7 @@
   function renderTabs() {
     const tabs = $('tabs'); tabs.classList.remove('hidden'); tabs.innerHTML = '';
     SHEET_ORDER.forEach(name => {
+      if (HIDDEN_TABS.has(name)) return;              // edited inline, not as a raw grid
       const rows = workbook[name] || [];
       const el = document.createElement('button');   // a real button → keyboard-operable
       el.type = 'button';
@@ -1061,6 +1102,26 @@
         `<div class="rolepick-panel">${items}${add}</div></details></td>`;
     };
 
+    // Tutor "Units" checklist (MD1–MD7). Each checked unit gets optional Day/Start/End selects that
+    // override the tutor's default time for that unit (blank = use default). Stored in TutorTimes.
+    const tutorUnitsCell = (i, r) => {
+      const tid = norm(r.TutorID);
+      const chosen = studentRoles(r.Units);
+      const summary = chosen.length ? escapeHtml(chosen.join(', ')) : '<span class="muted">— none —</span>';
+      const dflt = [norm(r.Day), norm(r.Start) && (norm(r.Start) + '–' + norm(r.End))].filter(Boolean).join(' ');
+      const sel = (uu, f, opts, cur) =>
+        `<select class="unittime" data-r="${i}" data-unit="${uu}" data-f="${f}" aria-label="${uu} ${f}"><option value="">${f === 'Day' ? 'default' : '—'}</option>` +
+        opts.map(o => `<option value="${escapeAttr(o)}"${o === cur ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('') + `</select>`;
+      const items = UNITS.map(uu => {
+        const on = chosen.includes(uu);
+        const ov = on ? tutorTimeOverride(tid, uu) : null;
+        const times = on ? `<span class="unit-time">${sel(uu, 'Day', DAYS, ov ? norm(ov.Day) : '')}${sel(uu, 'Start', HOURS, ov ? norm(ov.Start) : '')}${sel(uu, 'End', HOURS, ov ? norm(ov.End) : '')}</span>` : '';
+        return `<div class="unit-line"><label class="rolechk-item"><input type="checkbox" class="unitchk" data-r="${i}" data-unit="${uu}"${on ? ' checked' : ''}> ${uu}</label>${times}</div>`;
+      }).join('');
+      return `<td class="cell-edit"><details class="rolepick unitpick"><summary><span class="rolesum">${summary}</span></summary>` +
+        `<div class="rolepick-panel"><div class="unit-hint muted">Blank time = the tutor's default${dflt ? ' (' + escapeHtml(dflt) + ')' : ''}.</div>${items}</div></details></td>`;
+    };
+
     const cell = (r, i, c) => {
       const v = norm(r[c]);
       if (BOOL_COLS.has(c)) {
@@ -1079,8 +1140,8 @@
           all.map(x => `<option value="${escapeAttr(x)}"${x === v ? ' selected' : ''}>${escapeHtml(x)}</option>`).join('');
         return pickCell(i, c, opts);
       }
-      // Units a tutor covers: multi-select checklist of the fixed MD1–MD7 list (one group per unit).
-      if (c === 'Units') return multiPickCell(i, c, v, UNITS, false, 'No units');
+      // Units a tutor covers + an optional per-unit meeting-time override (one group per unit).
+      if (c === 'Units') return tutorUnitsCell(i, r);
       const fk = (FIELD_KINDS[sheet] || {})[c];
       if (fk && fk.enum) return pickCell(i, c, enumOptions(fk.enum, v));
       if (fk && fk.ref)  return pickCell(i, c, refOptions(fk.ref, v));
@@ -1162,6 +1223,20 @@
         workbook[sheet][r][c] = roles.join('; ');
         const det = t.closest('details'); const sum = det && det.querySelector('.rolesum');
         if (sum) sum.innerHTML = roles.length ? escapeHtml(roleLabels(roles.join('; '))) : '<span class="muted">— none —</span>';
+        refreshValidation(); pushHistory();
+      } else if (t.classList && t.classList.contains('unitchk')) {
+        // Toggle a unit on the tutor; dropping a unit also clears its per-unit time override.
+        const r = +t.dataset.r, unit = t.dataset.unit;
+        let units = studentRoles(workbook[sheet][r].Units);
+        if (t.checked) { if (!units.includes(unit)) units.push(unit); }
+        else { units = units.filter(x => x !== unit); setTutorTime(workbook[sheet][r].TutorID, unit, '', '', ''); }
+        workbook[sheet][r].Units = units.join('; ');
+        renderSheet(); refreshValidation(); pushHistory();   // re-render to show/hide the unit's time selects
+      } else if (t.classList && t.classList.contains('unittime')) {
+        // Set/clear this (tutor, unit) override from its three selects; no re-render (keep dropdown open).
+        const r = +t.dataset.r, unit = t.dataset.unit, line = t.closest('.unit-line');
+        const val = (f) => { const el = line && line.querySelector(`.unittime[data-f="${f}"]`); return el ? el.value : ''; };
+        setTutorTime(workbook[sheet][r].TutorID, unit, val('Day'), val('Start'), val('End'));
         refreshValidation(); pushHistory();
       } else if (t.classList && t.classList.contains('pick')) {
         workbook[sheet][+t.dataset.r][t.dataset.c] = t.value;
@@ -1472,9 +1547,9 @@
   // This unit's group slots, with parsed co-tutors and a capacity (min of tutor caps, default 6).
   // Groups are not cohort-specific — the same unit slots are reused for whichever class is solved.
   // If the Groups sheet defines no rows for the unit, auto-build ONE GROUP PER TUTOR assigned to
-  // it (a tutor with no Units listed counts for any unit): time slot from their Availability (a
-  // single AM/PM; blank if they cover both), capacity from Max Students. So creating the Groups
-  // sheet is optional — it only overrides this default.
+  // it (a tutor with no Units listed counts for any unit). The group's meeting time is the tutor's
+  // per-unit override (TutorTimes) for this unit if one exists, else the tutor's default Day/Start/End;
+  // capacity from Max Students. So creating the Groups sheet is optional — it only overrides this default.
   function groupsForUnit(wb, unit, tutorsById) {
     const mk = (GroupID, g, tutors, capacity) =>
       ({ GroupID, day: norm(g.Day), start: timeToMin(g.Start), end: timeToMin(g.End), tutors, capacity });
@@ -1486,14 +1561,21 @@
       return mk(norm(g.GroupID), g, tutors, caps.length ? Math.min(...caps) : 6);
     });
     const u = unit.toUpperCase();
+    // Per-(tutor, unit) time overrides, keyed `TID|UNIT`.
+    const ovMap = new Map();
+    (wb.TutorTimes || []).forEach(r => { const tid = norm(r.TutorID), un = norm(r.Unit).toUpperCase();
+      if (tid && un) ovMap.set(tid + '|' + un, r); });
     const out = [];
     (wb.Tutors || []).forEach((t) => {
       const tid = norm(t.TutorID); if (!tid) return;
       const units = splitIds(t.Units).map(x => x.toUpperCase());
       if (units.length && !units.includes(u)) return;          // tutor not assigned to this unit
       const n = Number(t.MaxStudents);
-      // Auto-built groups take the tutor's own meeting day/time, so block-outs apply to them too.
-      out.push({ GroupID: 'G' + (out.length + 1), day: norm(t.Day), start: timeToMin(t.Start), end: timeToMin(t.End),
+      const ov = ovMap.get(tid + '|' + u);                      // this unit's override time, if any
+      const day = norm(ov && ov.Day ? ov.Day : t.Day);
+      const start = timeToMin(ov && ov.Start ? ov.Start : t.Start);
+      const end = timeToMin(ov && ov.End ? ov.End : t.End);
+      out.push({ GroupID: 'G' + (out.length + 1), day, start, end,
                  tutors: [tid], capacity: isFinite(n) && n > 0 ? n : 6 });
     });
     return out;
