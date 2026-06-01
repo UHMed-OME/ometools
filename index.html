@@ -191,20 +191,20 @@
     .hint { color: var(--muted); font-size: 0.88rem; margin: 0 0 0.5rem; }
 
     /* --- Inline editor --- */
-    .sheet-tools { display: flex; gap: 0.6rem; align-items: center; padding: 0.6rem 0; }
+    .sheet-tools { display: flex; gap: 0.6rem; align-items: center; padding: 0.6rem 0.8rem; }
     /* Prominent "Add row" button (top) + a full-width one under the table. */
     .btn-addrow { display: inline-flex; align-items: center; gap: 0.35rem; font-weight: 600;
       color: var(--accent); background: var(--accent-bg); border: 1px solid var(--accent);
       padding: 0.5rem 0.9rem; border-radius: 7px; }
     .btn-addrow:hover { background: var(--accent); color: #fff; }
     .btn-addrow .icon { width: 16px; height: 16px; }
-    .addrow-foot { display: flex; align-items: center; justify-content: center; gap: 0.35rem; width: 100%;
-      margin-top: 0.5rem; padding: 0.6rem; font-weight: 600; color: var(--accent);
+    .addrow-foot { display: flex; align-items: center; justify-content: center; gap: 0.35rem; width: calc(100% - 1.6rem);
+      margin: 0.5rem 0.8rem 0.7rem; padding: 0.6rem; font-weight: 600; color: var(--accent);
       background: transparent; border: 1.5px dashed var(--accent); border-radius: 7px; }
     .addrow-foot:hover { background: var(--accent-bg); }
     .addrow-foot .icon { width: 16px; height: 16px; }
     /* Bulk multi-row edit bar */
-    .bulk-bar { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin: 0 0 0.6rem;
+    .bulk-bar { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin: 0 0.8rem 0.6rem;
       padding: 0.55rem 0.8rem; background: var(--accent-bg); border: 1px solid var(--accent); border-radius: 8px; font-size: 0.92rem; }
     .bulk-bar .bulk-n b { color: var(--accent); }
     .bulk-bar .bulk-set { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
