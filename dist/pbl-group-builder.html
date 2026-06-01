@@ -116,7 +116,11 @@
     button.loclink:hover { color: var(--brand-dark); }
     @keyframes rowflash { 0%, 100% { background: transparent; } 30% { background: rgba(240,179,35,0.35); } }
     tbody tr.flash td { animation: rowflash 1.4s ease-out; }
-    .tabs { display: flex; gap: 0.3rem; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-top: 0.5rem; }
+    /* Sheet tabs + the per-sheet row count / Add row, on one line sharing the underline. */
+    .tabbar { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap;
+      border-bottom: 1px solid var(--line); margin-top: 0.5rem; }
+    .tabs { display: flex; gap: 0.3rem; flex-wrap: wrap; flex: 1 1 auto; }
+    .sheet-actions { display: flex; align-items: center; gap: 0.7rem; padding-bottom: 0.3rem; flex-shrink: 0; }
     .tab {
       padding: 0.55rem 1rem; border: 1px solid transparent; border-bottom: none;
       border-radius: 7px 7px 0 0; cursor: pointer; font-size: 0.95rem; color: var(--muted);
@@ -431,8 +435,6 @@
         </div>
       </div>
 
-      <div id="dataSummary" class="summary-card hidden"></div>
-
       <div id="validation" class="hidden">
         <div class="vsummary" id="vsummary" aria-live="polite"></div>
         <div id="issues"></div>
@@ -443,7 +445,10 @@
           <label>Show class year&nbsp; <select id="rosterClass"></select></label>
           <span class="hint" style="margin:0">View and edit one class year at a time.</span>
         </div>
-        <div id="tabs" class="tabs hidden"></div>
+        <div class="tabbar">
+          <div id="tabs" class="tabs hidden"></div>
+          <div id="sheetActions" class="sheet-actions hidden"></div>
+        </div>
         <div id="sheetView" class="sheet-wrap hidden"></div>
       </div>
 
@@ -982,7 +987,6 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   }
 
   // ---- Rendering ---------------------------------------------------------
-  let editorOpen = true;         // is the spreadsheet editor expanded under the summary card?
   let lastValidation = null;     // most recent validate() result, for the summary card
   let rosterFilter = '';         // view/edit one class at a time ('' = all classes)
   let scheduleSubject = 'ImiGA'; // which subject's block-outs the Schedule calendar is editing
@@ -1003,22 +1007,10 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   }
 
   // At-a-glance roster summary with a toggle to expand the full editor.
+  // The editor is always shown; per-sheet counts live on the tabs, so there's no summary card.
   function renderSummary(res) {
-    lastValidation = res;
-    const counts = SHEET_ORDER.map(n => ({ n, c: (workbook[n] || []).length })).filter(x => x.c);
-    const nE = res.errors.length, nW = res.warnings.length;
-    // Assume good: only show a pill when something needs attention.
-    const status = nE ? `<span class="pill err">${nE} to fix</span>`
-      : (nW ? `<span class="pill warn">${nW} warning${nW > 1 ? 's' : ''}</span>` : '');
-    const countStr = counts.length
-      ? counts.map(x => `<span class="sc-n"><b>${x.c}</b> ${escapeHtml(sheetLabel(x.n).toLowerCase())}</span>`).join(' · ')
-      : 'No data yet';
-    $('dataSummary').innerHTML =
-      `<div class="summary-line">${countStr}${status ? ' &nbsp; ' + status : ''}</div>` +
-      `<button id="btnEditData" class="ghost" aria-expanded="${editorOpen}">${editorOpen ? 'Hide data ▴' : 'Edit data ▾'}</button>`;
-    $('dataSummary').classList.remove('hidden');
-    $('editorWrap').classList.toggle('hidden', !editorOpen);
-    $('btnEditData').onclick = () => { editorOpen = !editorOpen; renderSummary(lastValidation); };
+    if (res) lastValidation = res;
+    $('editorWrap').classList.remove('hidden');
   }
 
   function renderValidation(res) {
@@ -1043,7 +1035,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   // editor, switch to the sheet, clear any class filter, scroll to + flash the row.
   function jumpToError(sheet, ri) {
     showView('roster');
-    editorOpen = true; rosterFilter = '';
+    rosterFilter = '';
     if (lastValidation) renderSummary(lastValidation);
     renderRosterFilter();
     activeTab = sheet; renderTabs(); renderSheet();
@@ -1069,7 +1061,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   // and rows can be added/removed. Edits write straight back into `workbook`.
   function renderSheet() {
     const view = $('sheetView'); view.classList.remove('hidden');
-    if (activeTab === 'Blockouts') { renderSchedule(view); return; }   // the Schedule tab → week calendar
+    if (activeTab === 'Blockouts') { $('sheetActions').classList.add('hidden'); renderSchedule(view); return; }   // the Schedule tab → week calendar
     const sheet = activeTab;
     const rows = workbook[sheet] || (workbook[sheet] = []);
     const cols = SCHEMA[sheet] ? SCHEMA[sheet].required : (rows[0] ? Object.keys(rows[0]) : []);
@@ -1154,9 +1146,14 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
       `<button id="bulkApply" class="primary">Apply</button></span>` +
       `<button id="bulkDelete">Delete selected</button><button id="bulkClear" class="ghost">Clear</button></div>` : '';
 
+    // The row count + primary Add row live up on the tab bar (right side); the table area keeps
+    // the bulk bar and a full-width Add row at the bottom (where you naturally add to the list).
+    const acts = $('sheetActions'); acts.classList.remove('hidden');
+    acts.innerHTML = `<span class="hint" style="margin:0">${shown}</span>` +
+      `<button class="btn-addrow js-addrow" id="btnAddRow">${ICONS.plus} Add row</button>`;
+    acts.onclick = (e) => { if (e.target.closest && e.target.closest('.js-addrow')) addRow(); };
+
     view.innerHTML =
-      `<div class="sheet-tools"><button id="btnAddRow" class="btn-addrow js-addrow">${ICONS.plus} Add row</button>` +
-      `<span class="hint" style="margin:0 0 0 auto">${shown}</span></div>` +
       bulkBar +
       (cols.length
         ? `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>` +
@@ -1969,7 +1966,6 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     badRows = res.badRows;
     activeTab = focusSheet || SHEET_ORDER.find(s => (workbook[s] || []).length) || 'Students';
     $('placeholder').classList.add('hidden');
-    editorOpen = true;                // show the data expanded by default
     rosterFilter = '';
     renderValidation(res);
     renderSummary(res);
