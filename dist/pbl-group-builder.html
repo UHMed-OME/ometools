@@ -373,7 +373,7 @@
     /* --- Printable / PDF roster (hidden on screen, shown only when printing) --- */
     .print-only { display: none; }
     @media print {
-      header, main > *:not(#printRoster) { display: none !important; }
+      body > *:not(#printRoster) { display: none !important; }   /* hide all app UI (header, tabs, main, toast, modals) */
       #printRoster { display: block !important; color: #000; }
       #printRoster h1 { font-size: 18pt; margin: 0 0 0.5rem; }
       #printRoster .rgroup { page-break-inside: avoid; break-inside: avoid; margin: 0 0 14pt; }
