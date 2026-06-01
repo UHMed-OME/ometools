@@ -134,6 +134,8 @@
     .tab.active { color: var(--brand-dark); border-color: var(--line); background: var(--bg);
       margin-bottom: -1px; font-weight: 700; box-shadow: inset 0 2px 0 var(--brand); }
     .tab .count { color: var(--muted); font-weight: 400; }
+    .tab-opt { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
+      color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 0.05rem 0.3rem; }
     /* Roster summary card + collapsible editor */
     .summary-card { display: flex; align-items: center; justify-content: space-between; gap: 1rem;
       flex-wrap: wrap; padding: 0.8rem 1rem; background: var(--surface); border: 1px solid var(--line);
@@ -300,6 +302,7 @@
     .wrow input[type=range] { width: 100%; height: 6px; accent-color: var(--accent); }
     #scorecard { margin: 1.2rem 0; }
     .readiness { margin: 0.8rem 0; }
+    .solve-caption { margin: 0.5rem 0 0; }
     .example-badge { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; justify-content: space-between;
       margin: 0 0 0.9rem; padding: 0.5rem 0.8rem; font-size: 0.88rem; color: var(--brand-dark);
       background: var(--warn-bg); border: 1px solid var(--warn); border-radius: 8px; }
@@ -360,6 +363,9 @@
       max-width: 420px; width: 100%; box-shadow: 0 16px 48px rgba(0,0,0,0.28); }
     .modal-title { margin: 0 0 0.5rem; font-size: 1.1rem; color: var(--brand-dark); }
     .modal-msg { margin: 0 0 1.2rem; color: var(--fg); }
+    .help-steps { margin: 0 0 1rem; padding-left: 1.3rem; line-height: 1.5; }
+    .help-steps li { margin-bottom: 0.5rem; }
+    .help-steps code { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 0 0.25rem; font-size: 0.88em; }
     .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; }
     button.danger { background: var(--err); border-color: var(--err); color: #fff; }
     button.danger:hover { filter: brightness(1.08); background: var(--err); }
@@ -438,6 +444,10 @@
       <button id="btnExport" class="iconbtn primary" disabled title="Export workbook (.xlsx)" aria-label="Export workbook">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 19h16"/></svg><span class="btn-lbl">Export</span>
       </button>
+      <span class="tsep" aria-hidden="true"></span>
+      <button id="btnHelp" class="iconbtn" title="How it works" aria-label="How it works">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.5 2.5 0 1 1 3.4 2.3c-.8.4-1.4 1-1.4 1.9"/><path d="M12 17h.01"/></svg>
+      </button>
       </div>
     </div>
   </nav>
@@ -480,6 +490,7 @@
         Loading example data… New here? <b>Start from the template</b> (toolbar above), fill it in, then open it back here. You can also paste rows from Excel/Sheets.
       </div>
 
+      <div id="rosterReady" class="hidden" aria-live="polite"></div>
       <div id="rosterFoot" class="step-foot hidden">
         <span class="hint" style="margin:0">Roster looks good?</span>
         <button id="btnBuildStep" class="primary">Build groups →</button>
@@ -493,6 +504,7 @@
           <label>Unit&nbsp; <select id="unitSel"></select></label>
           <button id="btnSolve" class="primary"><svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l12-7z"/></svg> Solve groups</button>
         </div>
+        <p class="hint solve-caption">Pick the unit to build and which class year's students to place, then Solve.</p>
         <details class="weights advanced">
           <summary><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Advanced settings</summary>
           <p class="hint" style="margin:0.6rem 0 0">Soft-preference weights — higher means the solver tries harder to satisfy that preference. Defaults work for most cohorts.</p>
@@ -527,6 +539,19 @@
   <div id="toast" role="status" aria-live="polite"></div>
 
   <!-- In-app confirmation dialog (replaces the browser confirm()). -->
+  <div id="helpModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <div class="modal-card">
+      <h2 id="helpTitle" class="modal-title">How it works — 3 steps</h2>
+      <ol class="help-steps">
+        <li><b>Load</b> your roster — Open an <code>.xlsx</code>/<code>.csv</code>, paste rows, or start from the Template. Edit on the Roster tab.</li>
+        <li><b>Build</b> groups — go to the Groups tab, pick the unit (and class year), then Solve. Drag to adjust and lock students, then re-solve if needed.</li>
+        <li><b>Export</b> — download the workbook. <b>That file becomes your master</b> — open it next unit so history carries forward.</li>
+      </ol>
+      <p class="modal-msg" style="font-size:0.86rem">Groups are built automatically from the tutors you assign to a unit. The Schedule tab is optional.</p>
+      <div class="modal-actions"><button id="helpClose" class="primary">Got it</button></div>
+    </div>
+  </div>
+
   <div id="modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-card">
       <h2 id="modalTitle" class="modal-title">Please confirm</h2>
@@ -1087,7 +1112,8 @@
       el.type = 'button';
       el.className = 'tab' + (name === activeTab ? ' active' : '');
       el.setAttribute('aria-pressed', name === activeTab ? 'true' : 'false');
-      el.innerHTML = `${escapeHtml(sheetLabel(name))} <span class="count">(${rows.length})</span>`;
+      el.innerHTML = `${escapeHtml(sheetLabel(name))} <span class="count">(${rows.length})</span>` +
+        (name === 'Blockouts' ? ` <span class="tab-opt">optional</span>` : '');
       el.onclick = () => { activeTab = name; renderTabs(); renderSheet(); };
       tabs.appendChild(el);
     });
@@ -1399,6 +1425,7 @@
     const unitPick = `<label class="cal-overlay">Show group times for&nbsp;<select id="schedUnit">${units.map(u => optionTag(u, u, u === scheduleUnit)).join('')}</select></label>`;
 
     view.innerHTML =
+      `<p class="cal-blurb hint" style="margin:0 0.8rem 0.4rem">Optional — only needed if a role or unit has a recurring weekly time to keep groups clear of. Skip it otherwise.</p>` +
       `<div class="cal-bar"><label>Block out times for&nbsp;<select id="schedSubject">` +
         `<optgroup label="Roles">${optsOf('Role')}</optgroup><optgroup label="Units">${optsOf('Unit')}</optgroup></select></label>` +
         (schedAddingRole
@@ -1487,6 +1514,7 @@
     renderSummary(res);
     renderRosterFilter();
     renderTabs();
+    updateRosterReadiness();
     const bad = badRows[activeTab] || new Set();
     $('sheetView').querySelectorAll('tbody tr').forEach((tr, i) => tr.classList.toggle('badrow', bad.has(i)));
   }
@@ -1842,28 +1870,49 @@
     $('solver').classList.remove('hidden');
     updateReadiness();
   }
-  // Proactive pre-solve check: surface the hidden tutors→groups dependency (and capacity) before
-  // the operator hits the dead-end. Advisory only — doesn't block Solve.
-  function updateReadiness() {
-    const el = $('readiness'); if (!el) return;
-    if (!workbook) { el.classList.add('hidden'); return; }
-    const unit = norm($('unitSel').value); const u = unit.toUpperCase();
-    if (!unit) { el.classList.add('hidden'); el.innerHTML = ''; return; }
-    const tutors = (workbook.Tutors || []).filter(t => {
+  // Tutors who cover a given unit (a tutor with no Units listed counts for any unit).
+  function tutorsForUnit(unit) {
+    const u = norm(unit).toUpperCase();
+    return (workbook.Tutors || []).filter(t => {
       if (!norm(t.TutorID)) return false;
       const us = splitIds(t.Units).map(x => x.toUpperCase());
       return !us.length || us.includes(u);
     });
+  }
+  const seatsOf = (tutors) => tutors.reduce((a, t) => { const n = Number(t.MaxStudents); return a + (isFinite(n) && n > 0 ? n : 6); }, 0);
+  // Readiness messages for building one unit against a set of students. Advisory only.
+  function unitReadiness(unit, students, cohortLabel) {
+    const tutors = tutorsForUnit(unit), msgs = [];
+    if (!tutors.length) { msgs.push(`${unit}: no tutors assigned — add tutors and tick ${unit} in their Units on the Tutors tab.`); return msgs; }
+    if (students.length) { const seats = seatsOf(tutors);
+      if (seats < students.length) msgs.push(`${unit}: only ${seats} seat(s) across ${tutors.length} group(s) for ${students.length} students${cohortLabel ? ' in ' + cohortLabel : ''} — raise Max Students or add a tutor.`); }
+    return msgs;
+  }
+  // Proactive pre-solve check (Groups view): the selected unit + chosen class.
+  function updateReadiness() {
+    const el = $('readiness'); if (!el || !workbook) { el && el.classList.add('hidden'); return; }
+    const unit = norm($('unitSel').value);
+    if (!unit) { el.classList.add('hidden'); el.innerHTML = ''; return; }
     const co = $('cohortField').hidden ? '' : norm($('cohortSel').value);
     const students = (workbook.Students || []).filter(s => !co || norm(s.Cohort) === co);
-    const msgs = [];
-    if (!tutors.length) msgs.push(`No tutors are assigned to ${unit} — add tutors and tick ${unit} in their Units on the Tutors tab.`);
-    if (!students.length) msgs.push(`No students${co ? ' in class ' + co : ''} to place — add students on the Students tab.`);
-    if (tutors.length && students.length) {
-      const seats = tutors.reduce((a, t) => { const n = Number(t.MaxStudents); return a + (isFinite(n) && n > 0 ? n : 6); }, 0);
-      if (seats < students.length) msgs.push(`Only ${seats} seat(s) across ${tutors.length} ${unit} group(s) for ${students.length} students — raise Max Students or add a tutor.`);
-    }
+    const msgs = unitReadiness(unit, students, co ? 'class ' + co : '');
+    if (!students.length) msgs.unshift(`No students${co ? ' in class ' + co : ''} to place — add students on the Students tab.`);
     el.innerHTML = msgs.map(m => `<div class="issue warn">${escapeHtml(m)}</div>`).join('');
+    el.classList.toggle('hidden', !msgs.length);
+  }
+  // Roster-step readiness: warn about build blockers (no students/tutors, a unit with no tutors,
+  // or too few seats for the largest class) BEFORE the operator leaves the Roster for the dead-end.
+  function updateRosterReadiness() {
+    const el = $('rosterReady'); if (!el || !workbook) { el && el.classList.add('hidden'); return; }
+    const students = workbook.Students || [], tutorsAll = workbook.Tutors || [];
+    const cohorts = [...new Set(students.map(s => norm(s.Cohort)).filter(Boolean))];
+    const classSize = cohorts.length ? Math.max(...cohorts.map(c => students.filter(s => norm(s.Cohort) === c).length)) : students.length;
+    const msgs = [];
+    if (!students.length) msgs.push('No students yet — add them on the Students tab (or load your workbook).');
+    if (!tutorsAll.length) msgs.push('No tutors yet — add them on the Tutors tab and tick which units they cover.');
+    else availableUnits().forEach(u => msgs.push(...unitReadiness(u, students.slice(0, classSize))));
+    el.innerHTML = msgs.length
+      ? `<div class="readiness">${msgs.map(m => `<div class="issue warn">${escapeHtml(m)}</div>`).join('')}</div>` : '';
     el.classList.toggle('hidden', !msgs.length);
   }
   function getWeights() {
@@ -1924,7 +1973,7 @@
     sc.innerHTML =
       `<div class="sc-hard">${hard}</div><div class="sc-cards">${cards}</div>` +
       (flagList.length
-        ? `<div class="issue err"><b>${flagList.length} student(s) break a hard rule:</b> ` +
+        ? `<div class="issue err"><b>${flagList.length} student(s) are placed somewhere they can't be:</b> ` +
           flagList.map(([sid, v]) => `${escapeHtml(nameOf(sid))} — ${escapeHtml(v.rule)} (${escapeHtml(v.detail)})`).join('; ') +
           `. Move them, or fix the input and re-solve.</div>` : '') +
       (warnList.length
@@ -2086,6 +2135,7 @@
     renderTabs();
     renderSheet();
     renderSolverControls();
+    updateRosterReadiness();
     resetHistory();
     $('scorecard').innerHTML = ''; $('board').innerHTML = ''; lastResult = null; locked = new Set();
     $('boardActions').classList.add('hidden');
@@ -2109,7 +2159,7 @@
     });
     $('view-roster').hidden = v !== 'roster';
     $('view-groups').hidden = v !== 'groups';
-    if (v === 'groups' && workbook) updateReadiness();   // refresh the pre-solve check on entry
+    if (workbook) { v === 'groups' ? updateReadiness() : updateRosterReadiness(); }   // refresh checks on entry
   }
 
   // ---- In-app confirmation dialog (returns a Promise<boolean>) ------------
@@ -2144,6 +2194,14 @@
   }
 
   // ---- Wiring ------------------------------------------------------------
+  // Help dialog (how-it-works): open from the header "?", close on button / scrim / Escape.
+  const openHelp = () => { $('helpModal').classList.remove('hidden'); $('helpClose').focus(); };
+  const closeHelp = () => $('helpModal').classList.add('hidden');
+  $('btnHelp').onclick = openHelp;
+  $('helpClose').onclick = closeHelp;
+  $('helpModal').addEventListener('click', (e) => { if (e.target.id === 'helpModal') closeHelp(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('helpModal').classList.contains('hidden')) closeHelp(); });
+
   // Confirmation modal: buttons, scrim click, Escape.
   $('modalOk').onclick = () => closeModal(true);
   $('modalCancel').onclick = () => closeModal(false);
