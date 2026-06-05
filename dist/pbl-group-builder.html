@@ -226,15 +226,16 @@
     .bulk-bar .bulk-clear, .bulk-bar #bulkClear { margin-left: auto; }
     th.sel-col, td.sel-cell { width: 1%; text-align: center; padding: 0 0.3rem; }
     tr.selrow > td { background: var(--accent-bg); }
-    td.cell-edit { padding: 0 0.25rem; }   /* small gap so controls don't touch the next column */
+    td.cell-edit { padding: 0 0.25rem; max-width: 13rem; }   /* small gap + cap so no column blows out */
     input.cell {
-      width: 100%; min-width: 3.5rem; font: inherit; font-size: 0.9rem; border: 0;
+      width: 100%; min-width: 0; font: inherit; font-size: 0.9rem; border: 0;
       background: transparent; color: var(--fg); padding: 0.35rem 0.3rem; border-radius: 5px;
     }
     input.cell:focus { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-bg); }
     select.cell {
-      width: 100%; min-width: 0; font: inherit; font-size: 0.9rem; border: 0;
+      width: 100%; min-width: 0; max-width: 12rem; font: inherit; font-size: 0.9rem; border: 0;
       background: transparent; color: var(--fg); padding: 0.35rem 0.2rem; cursor: pointer; border-radius: 5px;
+      overflow: hidden; text-overflow: ellipsis;
     }
     select.cell:focus { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-bg); }
     /* Multi-role checklist dropdown (ScheduleTag) */
@@ -1274,8 +1275,11 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     const bad = badRows[sheet] || new Set();
     if (selSheet !== sheet) { selectedRows = new Set(); selSheet = sheet; }   // selection is per-sheet
 
+    // Size text inputs to their column so the grid sizes to content (a bare <input> defaults to
+    // ~20 chars, which forces every text column wide). Long values still scroll/edit on focus.
+    const COL_SIZE = { Name: 16, Reason: 20, StudentID: 8, TutorID: 8, GroupID: 6 };
     const textCell = (i, c, v) =>
-      `<td class="cell-edit"><input class="cell" type="text" data-r="${i}" data-c="${c}" value="${escapeAttr(v)}"></td>`;
+      `<td class="cell-edit"><input class="cell" type="text" size="${COL_SIZE[c] || 9}" data-r="${i}" data-c="${c}" value="${escapeAttr(v)}"></td>`;
 
     // A checklist dropdown for a delimited multi-value column (roles, tutor units). `options` are the
     // togglable values; `addable` shows an inline "new value" field (used by roles, not by units).
