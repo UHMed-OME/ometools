@@ -123,7 +123,21 @@
     tbody tr.flash td { animation: rowflash 1.4s ease-out; }
     /* Constrain the tabs + grid block to the table's own width so the row count / Add button
        line up with the table's right edge instead of floating out to the page edge. */
-    #editorWrap { width: max-content; max-width: 100%; }
+    #editorWrap { width: max-content; max-width: 100%; min-width: 0; }
+    /* Roster + quick-start split: editor hugs its content (left); a compact guide fills the
+       right margin and drops below the grid on narrow screens. */
+    .rsplit { display: flex; gap: 1.75rem; align-items: flex-start; flex-wrap: wrap; }
+    .quickstart { flex: 1 1 240px; min-width: 240px; max-width: 360px; align-self: flex-start;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 0.9rem 1.1rem; font-size: 0.88rem; }
+    .qs-head { display: flex; align-items: center; justify-content: space-between; font-weight: 700;
+      color: var(--brand-dark); margin-bottom: 0.5rem; }
+    .qs-x { background: none; border: 0; font-size: 1.1rem; line-height: 1; color: var(--muted); cursor: pointer; padding: 0 0.2rem; border-radius: 5px; }
+    .qs-x:hover { background: var(--accent-bg); color: var(--fg); }
+    .qs-steps { margin: 0 0 0.6rem; padding-left: 1.2rem; }
+    .qs-steps li { margin-bottom: 0.45rem; line-height: 1.4; }
+    .qs-steps li::marker { font-weight: 700; color: var(--accent); }
+    .qs-steps code { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0 0.22rem; font-size: 0.85em; }
+    .qs-tip { margin: 0; font-size: 0.8rem; color: var(--muted); }
     /* Sheet tabs + the per-sheet row count / Add row, on one line sharing the underline. */
     .tabbar { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap;
       border-bottom: 1px solid var(--line); margin-top: 0.5rem; }
@@ -509,16 +523,27 @@
         <div id="issues"></div>
       </div>
 
-      <div id="editorWrap" class="hidden">
-        <div id="rosterFilterBar" class="filter-bar hidden">
-          <label>Show class year&nbsp; <select id="rosterClass"></select></label>
-          <span class="hint" style="margin:0">View and edit one class year at a time.</span>
+      <div class="rsplit">
+        <div id="editorWrap" class="hidden">
+          <div id="rosterFilterBar" class="filter-bar hidden">
+            <label>Show class year&nbsp; <select id="rosterClass"></select></label>
+            <span class="hint" style="margin:0">View and edit one class year at a time.</span>
+          </div>
+          <div class="tabbar">
+            <div id="tabs" class="tabs hidden"></div>
+            <div id="sheetActions" class="sheet-actions hidden"></div>
+          </div>
+          <div id="sheetView" class="sheet-wrap hidden"></div>
         </div>
-        <div class="tabbar">
-          <div id="tabs" class="tabs hidden"></div>
-          <div id="sheetActions" class="sheet-actions hidden"></div>
-        </div>
-        <div id="sheetView" class="sheet-wrap hidden"></div>
+        <aside id="quickstart" class="quickstart hidden" aria-label="Quick start guide">
+          <div class="qs-head"><span>Quick start</span><button id="qsHide" class="qs-x" title="Hide" aria-label="Hide quick start">×</button></div>
+          <ol class="qs-steps">
+            <li><b>Load your roster</b> — Open an <code>.xlsx</code>/<code>.csv</code>, <b>Paste</b> rows, or start from the <b>Template</b>. Edit cells right here; add people with <b>+ Add</b>.</li>
+            <li><b>Build groups</b> — go to the <b>Groups</b> tab, pick the unit (and class year), then <b>Solve</b>. Drag to adjust, lock students, and re-solve.</li>
+            <li><b>Export</b> — download the workbook. <b>That file is your master</b> — open it next unit so history carries forward.</li>
+          </ol>
+          <p class="qs-tip">Groups are built from the tutors you assign to a unit. The <b>Schedule</b> tab is optional. Re-open these steps anytime from <b>?</b> in the header.</p>
+        </aside>
       </div>
 
       <div id="placeholder" class="empty">
@@ -910,6 +935,7 @@
   // ---- State -------------------------------------------------------------
   let workbook = null;       // { Students:[...], Tutors:[...], ... } row objects
   let usingExample = false;  // is the loaded workbook the built-in demo cohort? (drives the badge)
+  let quickstartHidden = false;   // session: did the operator dismiss the quick-start guide?
   let activeTab = null;
   let badRows = {};          // sheet -> Set of row indices flagged by validation
 
@@ -1215,6 +1241,7 @@
   function renderSummary(res) {
     if (res) lastValidation = res;
     $('editorWrap').classList.remove('hidden');
+    $('quickstart').classList.toggle('hidden', quickstartHidden);   // guide in the right margin
   }
 
   function renderValidation(res) {
@@ -2423,6 +2450,7 @@
   const closeHelp = () => $('helpModal').classList.add('hidden');
   $('btnHelp').onclick = openHelp;
   $('helpClose').onclick = closeHelp;
+  $('qsHide').onclick = () => { quickstartHidden = true; $('quickstart').classList.add('hidden'); };
   $('helpModal').addEventListener('click', (e) => { if (e.target.id === 'helpModal') closeHelp(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('helpModal').classList.contains('hidden')) closeHelp(); });
 
