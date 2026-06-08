@@ -121,6 +121,9 @@
     button.loclink:hover { color: var(--brand-dark); }
     @keyframes rowflash { 0%, 100% { background: transparent; } 30% { background: rgba(240,179,35,0.35); } }
     tbody tr.flash td { animation: rowflash 1.4s ease-out; }
+    /* Constrain the tabs + grid block to the table's own width so the row count / Add button
+       line up with the table's right edge instead of floating out to the page edge. */
+    #editorWrap { width: max-content; max-width: 100%; }
     /* Sheet tabs + the per-sheet row count / Add row, on one line sharing the underline. */
     .tabbar { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap;
       border-bottom: 1px solid var(--line); margin-top: 0.5rem; }
