@@ -172,14 +172,14 @@
     .cal-legend .lg-coll { background: repeating-linear-gradient(45deg, var(--err), var(--err) 3px, var(--warn) 3px, var(--warn) 6px); }
     /* Shrink the bordered box to the table so it's left-aligned and compact, not full-width. */
     .sheet-wrap { overflow: auto; border: 1px solid var(--line); border-top: none; border-radius: 0 0 8px 8px;
-      display: inline-block; max-width: 100%; vertical-align: top; }
+      display: inline-block; width: max-content; max-width: 100%; vertical-align: top; }
     /* Sticky first column keeps the key in view while scrolling wide sheets. */
     .sheet-wrap th:first-child, .sheet-wrap td:first-child { position: sticky; left: 0; background: var(--bg); z-index: 1; }
     .sheet-wrap thead th:first-child { background: var(--surface); z-index: 4; }
     .sheet-wrap tbody tr:hover td:first-child { background: var(--surface); }
     .sheet-wrap tr.badrow td:first-child { background: var(--err-bg); }
-    /* Auto width so columns hug their content instead of stretching across the page. */
-    table { border-collapse: collapse; width: auto; font-size: 0.9rem; }
+    /* max-content so the table hugs its columns and never stretches across the page. */
+    table { border-collapse: collapse; width: max-content; font-size: 0.9rem; }
     th, td { text-align: left; padding: 0.3rem 0.55rem; border-bottom: 1px solid var(--line);
       border-right: 1px solid rgba(127,127,127,0.10); white-space: nowrap; }
     th:last-child, td:last-child { border-right: none; }
