@@ -123,21 +123,7 @@
     tbody tr.flash td { animation: rowflash 1.4s ease-out; }
     /* Constrain the tabs + grid block to the table's own width so the row count / Add button
        line up with the table's right edge instead of floating out to the page edge. */
-    #editorWrap { width: max-content; max-width: 100%; min-width: 0; }
-    /* Roster + groups-preview split: editor hugs its content (left), the groups preview fills the
-       right margin and its group cards wrap so the board never runs past the page. */
-    .rsplit { display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap; }
-    .groups-aside { flex: 1 1 320px; min-width: 280px; }
-    .pg-title { font-weight: 600; font-size: 0.95rem; margin: 0 0 0.55rem; }
-    .pg-grid { display: flex; flex-wrap: wrap; gap: 0.55rem; }   /* wrap → limits horizontal span */
-    .pg-card { flex: 1 1 150px; max-width: 210px; min-width: 140px; border: 1px solid var(--line);
-      border-radius: 8px; background: var(--bg); overflow: hidden; box-shadow: var(--e1); }
-    .pg-head { background: var(--surface); padding: 0.35rem 0.5rem; font-weight: 600; font-size: 0.82rem;
-      border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: baseline; }
-    .pg-head .pg-tut { font-weight: 400; color: var(--muted); font-size: 0.76rem; }
-    .pg-list { list-style: none; margin: 0; padding: 0.3rem 0.5rem; font-size: 0.8rem; }
-    .pg-list li { padding: 0.12rem 0; display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; }
-    .pg-list li.muted { color: var(--muted); }
+    #editorWrap { width: max-content; max-width: 100%; }
     /* Sheet tabs + the per-sheet row count / Add row, on one line sharing the underline. */
     .tabbar { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap;
       border-bottom: 1px solid var(--line); margin-top: 0.5rem; }
@@ -523,19 +509,16 @@
         <div id="issues"></div>
       </div>
 
-      <div class="rsplit">
-        <div id="editorWrap" class="hidden">
-          <div id="rosterFilterBar" class="filter-bar hidden">
-            <label>Show class year&nbsp; <select id="rosterClass"></select></label>
-            <span class="hint" style="margin:0">View and edit one class year at a time.</span>
-          </div>
-          <div class="tabbar">
-            <div id="tabs" class="tabs hidden"></div>
-            <div id="sheetActions" class="sheet-actions hidden"></div>
-          </div>
-          <div id="sheetView" class="sheet-wrap hidden"></div>
+      <div id="editorWrap" class="hidden">
+        <div id="rosterFilterBar" class="filter-bar hidden">
+          <label>Show class year&nbsp; <select id="rosterClass"></select></label>
+          <span class="hint" style="margin:0">View and edit one class year at a time.</span>
         </div>
-        <aside id="groupsAside" class="groups-aside hidden" aria-label="Groups preview"></aside>
+        <div class="tabbar">
+          <div id="tabs" class="tabs hidden"></div>
+          <div id="sheetActions" class="sheet-actions hidden"></div>
+        </div>
+        <div id="sheetView" class="sheet-wrap hidden"></div>
       </div>
 
       <div id="placeholder" class="empty">
@@ -2191,7 +2174,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     if (res.error) {
       sc.innerHTML = `<div class="issue err">${escapeHtml(res.error)}</div>`;
       board.innerHTML = ''; $('boardActions').classList.add('hidden');
-      $('buildFoot').classList.add('hidden'); $('boardEmpty').classList.add('hidden'); renderRosterAside(); return;
+      $('buildFoot').classList.add('hidden'); $('boardEmpty').classList.add('hidden'); return;
     }
     const students = new Map((workbook.Students || []).map(s => [norm(s.StudentID), s]));
     const tutors = new Map((workbook.Tutors || []).map(t => [norm(t.TutorID), norm(t.Name) || norm(t.TutorID)]));
@@ -2285,28 +2268,6 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
         `<div class="gsummary">${escapeHtml(summary)}</div></div>` +
         `<div class="gbody" data-gi="${gi}">${chips}</div><div class="gcount">${g.students.length} / ${g.capacity}</div></div>`;
     }).join('');
-    renderRosterAside();
-  }
-
-  // Compact, read-only preview of the solved groups, shown in the Roster view's right margin.
-  // Group cards wrap (flex) so the board never runs past the page; full editing stays on Groups.
-  function renderRosterAside() {
-    const aside = $('groupsAside'); if (!aside) return;
-    const res = lastResult;
-    if (!res || res.error || !res.groups || !res.groups.length) { aside.classList.add('hidden'); aside.innerHTML = ''; return; }
-    const studById = new Map((workbook.Students || []).map(s => [norm(s.StudentID), s]));
-    const tutorName = new Map((workbook.Tutors || []).map(t => [norm(t.TutorID), norm(t.Name) || norm(t.TutorID)]));
-    const cards = res.groups.map(g => {
-      const tut = g.tutors.map(t => tutorName.get(t) || t).join(', ') || '—';
-      const lis = g.students.map(sid => { const s = studById.get(sid) || {};
-        const pills = studentRoles(s.ScheduleTag).map(rolePill).join('');
-        return `<li>${escapeHtml(norm(s.Name) || sid)}${pills}</li>`;
-      }).join('') || '<li class="muted">— empty —</li>';
-      return `<div class="pg-card"><div class="pg-head">${escapeHtml(groupLabel(g.GroupID))} <span class="pg-tut">${escapeHtml(tut)}</span></div><ul class="pg-list">${lis}</ul></div>`;
-    }).join('');
-    const co = norm(res.cohort);
-    aside.innerHTML = `<div class="pg-title">Groups — ${escapeHtml(res.unit)}${co ? ' · ' + escapeHtml(co) : ''} <span class="muted">(preview · edit on the Groups tab)</span></div><div class="pg-grid">${cards}</div>`;
-    aside.classList.remove('hidden');
   }
 
   // Manual board edits operate on lastResult.groups, then re-render (which re-validates live).
@@ -2448,7 +2409,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     });
     $('view-roster').hidden = v !== 'roster';
     $('view-groups').hidden = v !== 'groups';
-    if (workbook) { v === 'groups' ? updateReadiness() : (updateRosterReadiness(), renderRosterAside()); }   // refresh checks on entry
+    if (workbook) { v === 'groups' ? updateReadiness() : updateRosterReadiness(); }   // refresh checks on entry
   }
 
   // ---- In-app confirmation dialog (returns a Promise<boolean>) ------------
