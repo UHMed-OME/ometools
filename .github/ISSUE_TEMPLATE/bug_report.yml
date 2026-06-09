@@ -1,0 +1,67 @@
+name: Bug report
+description: Report something that is broken or confusing.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. This is a public GitHub issue.
+
+        Do not include student names, IDs, schedules, screenshots with roster data, or any other FERPA-protected information.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the problem in a sentence or two.
+      placeholder: The export button stays disabled after solving groups.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Use example data or de-identified data only.
+      placeholder: |
+        1. Open the app
+        2. Load example data
+        3. Go to Groups
+        4. Click Solve groups
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: I expected the workbook export to become available.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: The button remained disabled.
+    validations:
+      required: true
+  - type: dropdown
+    id: tool
+    attributes:
+      label: Tool
+      options:
+        - PBL Group Builder
+        - Procurement Wizard
+        - OME Web Toolkit shell
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and operating system
+      placeholder: Chrome 125 on Windows 11
+  - type: textarea
+    id: data_note
+    attributes:
+      label: Data note
+      description: If data shape matters, describe it without real student data.
+      placeholder: Example data works, but my de-identified workbook has 82 students and 14 tutors.

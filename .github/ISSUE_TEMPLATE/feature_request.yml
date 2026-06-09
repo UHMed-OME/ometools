@@ -1,0 +1,48 @@
+name: Feature request
+description: Suggest an improvement or new tool.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. This is a public GitHub issue.
+
+        Do not include student names, IDs, schedules, screenshots with roster data, or any other FERPA-protected information.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      placeholder: I need to compare two possible group assignments before exporting.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      placeholder: Add a "Save draft assignment" button and a draft switcher in the Groups view.
+    validations:
+      required: true
+  - type: dropdown
+    id: tool
+    attributes:
+      label: Tool
+      options:
+        - PBL Group Builder
+        - Procurement Wizard
+        - New OME tool
+        - OME Web Toolkit shell
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Workflow context
+      description: Who would use this, when, and how often?
+      placeholder: PBL coordinators would use this after solving each unit, before sending the final roster.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      placeholder: Currently we export multiple files and compare them manually.

@@ -477,6 +477,13 @@
     .help-steps { margin: 0 0 1rem; padding-left: 1.3rem; line-height: 1.5; }
     .help-steps li { margin-bottom: 0.5rem; }
     .help-steps code { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 0 0.25rem; font-size: 0.88em; }
+    .support-box { margin: 1rem 0; padding: 0.8rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+    .support-box p { margin: 0 0 0.65rem; font-size: 0.88rem; color: var(--muted); }
+    .support-links { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .support-links a { display: inline-flex; align-items: center; min-height: 40px; padding: 0.45rem 0.75rem;
+      border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg);
+      text-decoration: none; font-size: 0.9rem; font-weight: 600; }
+    .support-links a:hover { background: var(--accent-bg); color: var(--brand-dark); }
     /* Add-record ingest form */
     .form-card { width: 540px; max-width: 100%; max-height: 86vh; overflow: auto; }
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem 0.9rem; margin: 0.4rem 0 0; }
@@ -789,6 +796,13 @@
         <li><b>Export</b> — download the workbook. <b>That file becomes your master</b> — open it next unit so history carries forward.</li>
       </ol>
       <p class="modal-msg" style="font-size:0.86rem">Groups are built automatically from the tutors you assign to a unit. The Schedule tab is optional.</p>
+      <div class="support-box">
+        <p>Found a problem or have an idea? Open a GitHub issue. Do not include student names, IDs, schedules, or screenshots with roster data.</p>
+        <div class="support-links">
+          <a href="https://github.com/UHMed-OME/ometools/issues/new?template=bug_report.yml" target="_blank" rel="noopener">Report a bug</a>
+          <a href="https://github.com/UHMed-OME/ometools/issues/new?template=feature_request.yml" target="_blank" rel="noopener">Request a feature</a>
+        </div>
+      </div>
       <div class="modal-actions"><button id="helpTour">▶ Take the tour</button><button id="helpClose" class="primary">Got it</button></div>
     </div>
   </div>

@@ -25,6 +25,14 @@ SheetJS and the logo are inlined into the single file; nothing loads from a CDN.
 - **Export** — write the assignment back as a per-unit Results sheet + appended history, and
   print/save a PDF roster.
 
+## Feedback
+Use GitHub Issues to report bugs or request features:
+- [Report a bug](https://github.com/UHMed-OME/ometools/issues/new?template=bug_report.yml)
+- [Request a feature](https://github.com/UHMed-OME/ometools/issues/new?template=feature_request.yml)
+
+Please do not include student names, IDs, schedules, screenshots with roster data, or any other
+FERPA-protected information in public issues.
+
 ## Develop
 - Run: open `index.html` in a browser (`start index.html` on Windows).
 - Build the single file: `node build.mjs` → `dist/pbl-group-builder.html`.
