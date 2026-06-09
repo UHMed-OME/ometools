@@ -74,7 +74,10 @@
     .os-tool .label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .os-tool .soon { margin-left: auto; font-size: 0.58rem; font-weight: 700; letter-spacing: 0.04em;
       text-transform: uppercase; color: var(--muted); background: var(--surface); border-radius: 5px; padding: 0.08rem 0.32rem; }
-    .os-foot { padding: 0.8rem 1.15rem; font-size: 0.7rem; color: var(--muted); white-space: nowrap; border-top: 1px solid var(--line); }
+    .os-foot { padding: 0.8rem 1.15rem; font-size: 0.7rem; color: var(--muted); white-space: nowrap; border-top: 1px solid var(--line);
+      display: grid; gap: 0.3rem; }
+    .os-foot a { color: var(--accent); font-weight: 700; text-decoration: none; }
+    .os-foot a:hover { color: var(--brand-dark); text-decoration: underline; }
     .os-body { margin-left: 230px; margin-top: 58px; min-width: 0; transition: margin 0.15s ease; }
     .tool-panel[hidden] { display: none; }
     /* Collapsed → clean icon rail */
@@ -562,7 +565,10 @@
       </div>
       <div class="os-seclabel">Tools</div>
       <nav class="os-tools" id="osTools" aria-label="Tools"></nav>
-      <div class="os-foot">Office of Medical Education</div>
+      <div class="os-foot">
+        <span>Office of Medical Education</span>
+        <a href="https://github.com/UHMed-OME/ometools/issues/new/choose" target="_blank" rel="noopener">Feedback</a>
+      </div>
     </aside>
 
     <div class="os-body">
