@@ -110,6 +110,8 @@
     .tk-title b { font-size: 1rem; font-weight: 700; color: var(--brand-dark); letter-spacing: 0.01em; white-space: nowrap; }
     .tk-title .tk-sub { font-size: 0.74rem; color: var(--muted); white-space: nowrap; }
     .tk-right { margin-left: auto; display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; justify-content: flex-end; }
+    .tool-actions { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; justify-content: flex-end; }
+    .tool-actions[hidden] { display: none; }
     .tk-right #loadedName { min-width: 0; max-width: 30vw; }
     /* Tool sub-header (per-tool title), sits under the top bar. */
     .tool-head { padding: 0.85rem 1.5rem; background: var(--bg); border-bottom: 1px solid var(--line);
@@ -521,8 +523,10 @@
         <span class="tk-title"><b>Office of Medical Education</b><span class="tk-sub">Web Toolkit</span></span>
       </div>
       <div class="tk-right">
+        <!-- Active tool's actions render here (scoped by data-tool); not global. -->
+        <div class="tool-actions" data-tool="pbl">
         <span id="loadedName" class="tag"></span>
-        <div class="transport" role="toolbar" aria-label="Actions">
+        <div class="transport" role="toolbar" aria-label="PBL Group Builder actions">
       <button id="btnExample" class="iconbtn" title="Load example data" aria-label="Load example data">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3v4M3 5h4"/><path d="M18 14v4M16 16h4"/><path d="M12 5l2.4 5.6L20 13l-5.6 2.4L12 21l-2.4-5.6L4 13l5.6-2.4z"/></svg><span class="btn-lbl">Example</span>
       </button>
@@ -551,6 +555,7 @@
       <button id="btnHelp" class="iconbtn" title="How it works" aria-label="How it works">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.5 2.5 0 1 1 3.4 2.3c-.8.4-1.4 1-1.4 1.9"/><path d="M12 17h.01"/></svg>
       </button>
+        </div>
         </div>
       </div>
     </header>
@@ -2580,6 +2585,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     const t = TOOLS.find(x => x.id === id); if (!t || !t.available) return;
     activeTool = id;
     document.querySelectorAll('.tool-panel').forEach(p => { p.hidden = p.id !== 'tool-' + id; });
+    document.querySelectorAll('.tool-actions').forEach(a => { a.hidden = a.dataset.tool !== id; });   // top-bar actions follow the active tool
     $('osTools').querySelectorAll('.os-tool').forEach(b => b.classList.toggle('active', b.dataset.tool === id));
   }
   renderTools();
