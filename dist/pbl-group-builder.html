@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
+  <!-- Inline favicon (data URI) — keeps the app a single self-contained offline file, no network request. -->
+  <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNyIgZmlsbD0iIzAyNDczMSIvPjxwYXRoIGQ9Ik0xMyA1LjVoNlYxM2g3LjV2NkgxOXY3LjVoLTZWMTlINS41di02SDEzeiIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==">
   <title>OME Web Toolkit — PBL Group Builder</title>
   <style>
     /* Light theme only (no dark-mode switch — see spec/CLAUDE.md). */
@@ -146,7 +148,14 @@
     .proc-gates { padding: 0.6rem 0.7rem; border-radius: 8px; border: 1px solid var(--warn); background: var(--warn-bg); }
     .proc-links { list-style: none; padding-left: 0; display: grid; gap: 0.3rem; }
     .proc-links a, .proc-coop a { color: var(--brand-dark); font-weight: 600; }
+    .proc-quoteq { margin-top: 0.3rem !important; }
     .proc-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .proc-packet { margin-top: 1rem; }
+    .proc-pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .proc-docpick { border: 1px solid var(--line); border-radius: 8px; padding: 0.6rem 0.8rem; display: grid; gap: 0.4rem; }
+    .proc-docpick legend { font-weight: 600; font-size: 0.85rem; color: var(--brand-dark); padding: 0 0.3rem; }
+    .proc-docpick label { display: flex; align-items: center; gap: 0.45rem; font-size: 0.9rem; }
+    @media (max-width: 640px) { .proc-pgrid { grid-template-columns: 1fr; } }
     @media (max-width: 900px) { .proc-grid { grid-template-columns: 1fr; } }
     /* Transport lives on the right of the Roster/Groups tab row. */
     .apptabs .tool-actions { margin-left: auto; }
@@ -803,6 +812,47 @@
               </div>
             </section>
           </div>
+
+          <section class="proc-panel proc-packet" aria-labelledby="procPacketTitle">
+            <h2 id="procPacketTitle">Generate submission packet (PDF)</h2>
+            <div class="proc-body">
+              <p class="hint">Fill these in to produce a ready-to-submit PDF — a cover sheet plus the forms your request needs. Stays on your machine; nothing is uploaded.</p>
+              <div class="proc-pgrid">
+                <label class="proc-field">Requestor name <input id="pkRequestor" type="text"></label>
+                <label class="proc-field">Department / program <input id="pkDept" type="text"></label>
+                <label class="proc-field">Fund / account code <input id="pkFund" type="text"></label>
+                <label class="proc-field">Vendor name <input id="pkVendor" type="text"></label>
+              </div>
+              <label class="proc-field">Business purpose / description
+                <textarea id="pkPurpose" placeholder="What is being purchased and why"></textarea>
+              </label>
+              <div id="pkSoleWrap" hidden>
+                <label class="proc-field">Why is this the only practical source?
+                  <textarea id="pkSoleWhy"></textarea>
+                </label>
+                <label class="proc-field">Unique features / capabilities
+                  <textarea id="pkSoleUnique"></textarea>
+                </label>
+                <label class="proc-field">Basis for price reasonableness
+                  <textarea id="pkSolePrice"></textarea>
+                </label>
+              </div>
+              <label class="proc-field">Quotes gathered <span class="muted">(one per line: Vendor, Amount, Date)</span>
+                <textarea id="pkQuotes" placeholder="Acme Co, 4200.00, 2026-06-01"></textarea>
+              </label>
+              <fieldset class="proc-docpick">
+                <legend>Include in packet</legend>
+                <label><input type="checkbox" id="pkDocCover" checked> Request cover sheet</label>
+                <label><input type="checkbox" id="pkDocSole"> Sole source justification</label>
+                <label><input type="checkbox" id="pkDocQuotes"> Quote / price summary</label>
+                <label><input type="checkbox" id="pkDocChecklist"> RCUH procurement checklist</label>
+              </fieldset>
+              <div class="proc-actions">
+                <button id="pkGenerate" class="primary">⬇ Download packet (PDF)</button>
+              </div>
+              <p id="pkMsg" class="hint" aria-live="polite"></p>
+            </div>
+          </section>
         </main>
       </section>
       <!-- Future tools mount here as additional .tool-panel sections (hidden until selected). -->
@@ -3053,12 +3103,18 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     opm:           { name: 'UH OPM forms & resources', url: 'https://www.hawaii.edu/procurement/' },
   };
   const PROC_COOP = {
-    computer: { ref: 'NASPO 24-03', name: 'Computer Equipment (desktops / laptops / servers)', url: 'https://www.naspovaluepoint.org/' },
-    software: { ref: 'SPO 17-18',  name: 'NASPO Cloud Solutions — Carahsoft / SHI / Insight', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/' },
-    lab:      { ref: 'SPO 24-13',  name: 'Lab Equipment & Supplies — Fisher / VWR / Nikon', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/' },
-    medical:  { ref: 'SPO 24-11',  name: 'MMCAP Medical Products — Henry Schein (membership first)', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/' },
-    office:   { ref: 'SPO 25-12 / NASPO 23-15', name: 'Office Supplies / Furniture — Office Depot, Fisher Hawaii, local dealers', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/' },
-    av:       { ref: 'SPO 26-14',  name: 'AV Equipment & Services — B&H Photo Video', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/' },
+    computer: { ref: 'NASPO 24-03', name: 'Computer Equipment (desktops / laptops / servers)', url: 'https://www.naspovaluepoint.org/',
+      vendors: ['Dell', 'HP', 'Lenovo'], quoteVia: 'Request quotes from the awarded NASPO ValuePoint resellers, then process via SuperQuotes.' },
+    software: { ref: 'SPO 17-18',  name: 'NASPO Cloud Solutions', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/',
+      vendors: ['Carahsoft', 'SHI International', 'Insight Public Sector'], quoteVia: 'Email a reseller for a quote citing SPO 17-18.' },
+    lab:      { ref: 'SPO 24-13',  name: 'Lab Equipment & Supplies', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/',
+      vendors: ['Fisher Scientific', 'VWR / Avantor', 'Nikon'], quoteVia: 'Request a contract-priced quote citing SPO 24-13.' },
+    medical:  { ref: 'SPO 24-11',  name: 'MMCAP Medical Products', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/',
+      vendors: ['Henry Schein'], quoteVia: 'Join MMCAP Infuse first (Christopher.J.Amandi@hawaii.gov), then order at member pricing.' },
+    office:   { ref: 'SPO 25-12 / NASPO 23-15', name: 'Office Supplies / Furniture', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/',
+      vendors: ['Office Depot', 'Fisher Hawaii'], quoteVia: 'Order supplies at contract price; for furniture get a dealer quote citing the contract.' },
+    av:       { ref: 'SPO 26-14',  name: 'AV Equipment & Services', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/',
+      vendors: ['B&H Photo Video'], quoteVia: 'Request a quote from B&H Photo Video citing SPO 26-14.' },
   };
 
   // Pure decision engine: fund + category + amount → method, routing, forms, contract, checklist.
@@ -3125,6 +3181,152 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     r.notes = procValue('procNotes');
     return r;
   }
+
+  // ---- Packet PDF generation (dependency-free; PDF is a text format) --------
+  // Sanitize to the printable-ASCII range the standard Helvetica font covers, so
+  // string char-length equals byte-length and the xref byte offsets stay correct.
+  function pdfSan(s) {
+    return String(s == null ? '' : s)
+      .replace(/[–—]/g, '-').replace(/[‘’‚‛]/g, "'")
+      .replace(/[“”„‟]/g, '"').replace(/[•·]/g, '*')
+      .replace(/→/g, '->').replace(/[^\x09\x0a\x20-\x7e]/g, '');
+  }
+  function pdfEsc(s) { return pdfSan(s).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)'); }
+  function pdfWrap(s, size, width) {
+    const max = Math.max(1, Math.floor(width / (size * 0.52))), out = [];
+    for (const raw of pdfSan(s).split(/\r?\n/)) {
+      const words = raw.split(/\s+/).filter(Boolean);
+      if (!words.length) { out.push(''); continue; }
+      let line = '';
+      for (let w of words) {
+        while (w.length > max) { if (line) { out.push(line); line = ''; } out.push(w.slice(0, max)); w = w.slice(max); }
+        if (line && line.length + 1 + w.length > max) { out.push(line); line = w; }
+        else line = line ? line + ' ' + w : w;
+      }
+      if (line) out.push(line);
+    }
+    return out;
+  }
+  // Lay a list of documents out into page content streams (each doc starts fresh).
+  function pdfLayout(docs) {
+    const PW = 612, PH = 792, M = 54, maxW = PW - 2 * M, bottom = M;
+    const pages = []; let ops = [], y = PH - M;
+    const flush = () => { pages.push(ops.join('\n')); ops = []; y = PH - M; };
+    const need = h => { if (y - h < bottom) flush(); };
+    const put = (s, x, yy, size, bold) => ops.push(`BT /${bold ? 'F2' : 'F1'} ${size} Tf 1 0 0 1 ${x.toFixed(1)} ${yy.toFixed(1)} Tm (${pdfEsc(s)}) Tj ET`);
+    const line = (x1, yy, x2) => ops.push(`${x1.toFixed(1)} ${yy.toFixed(1)} m ${x2.toFixed(1)} ${yy.toFixed(1)} l 0.6 w 0.6 0.6 0.6 RG S`);
+    docs.forEach((doc, di) => {
+      if (di > 0) flush();
+      for (const b of doc) {
+        if (b.t === 'h') { need(30); put(b.text, M, y - 16, 16, true); y -= 22; line(M, y, PW - M); y -= 14; }
+        else if (b.t === 'sub') { need(22); y -= 4; put(b.text, M, y - 11, 12, true); y -= 18; }
+        else if (b.t === 'kv') { const vl = pdfWrap(b.v || '', 11, maxW - 150) || ['']; const n = Math.max(1, vl.length); need(14 * n); put(b.k, M, y - 11, 11, true); vl.forEach((ln, i) => put(ln, M + 150, y - 11 - i * 13, 11, false)); y -= 14 * n; }
+        else if (b.t === 'para') { for (const ln of pdfWrap(b.text || '-', 11, maxW)) { need(14); put(ln, M, y - 11, 11, false); y -= 14; } }
+        else if (b.t === 'check') { const wl = pdfWrap(b.text, 11, maxW - 24); const n = Math.max(1, wl.length); need(14 * n + 2); put(`[${b.checked ? 'X' : ' '}]`, M, y - 11, 11, true); wl.forEach((ln, i) => put(ln, M + 24, y - 11 - i * 13, 11, false)); y -= 14 * n + 2; }
+        else if (b.t === 'row') { const w = [maxW * 0.5, maxW * 0.28]; const xs = [M, M + w[0], M + w[0] + w[1]]; need(15); b.cols.forEach((c, i) => put(String(c == null ? '' : c), xs[i], y - 11, 10, !!b.head)); y -= 13; line(M, y + 1, PW - M); y -= 4; }
+        else if (b.t === 'rule') { need(8); line(M, y, PW - M); y -= 10; }
+        else if (b.t === 'gap') { need(b.h || 10); y -= (b.h || 10); }
+        else if (b.t === 'sig') { need(34); y -= 18; put('Signature: ______________________________      Date: ________________', M, y - 11, 11, false); y -= 16; }
+      }
+    });
+    flush();
+    return pages;
+  }
+  // Assemble page content streams into a minimal, valid single-file PDF.
+  function buildPdf(pages) {
+    const objs = [];
+    objs[0] = '<</Type/Catalog/Pages 2 0 R>>';
+    const pageNums = pages.map((_, i) => 5 + i * 2);
+    objs[1] = `<</Type/Pages/Kids[${pageNums.map(n => n + ' 0 R').join(' ')}]/Count ${pages.length}>>`;
+    objs[2] = '<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>';
+    objs[3] = '<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold>>';
+    pages.forEach((c, i) => {
+      const pageNo = 5 + i * 2, contentNo = 6 + i * 2;
+      objs[pageNo - 1] = `<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 3 0 R/F2 4 0 R>>>>/Contents ${contentNo} 0 R>>`;
+      objs[contentNo - 1] = `<</Length ${c.length}>>\nstream\n${c}\nendstream`;
+    });
+    let pdf = '%PDF-1.4\n'; const offsets = [];
+    for (let i = 0; i < objs.length; i++) { offsets[i] = pdf.length; pdf += `${i + 1} 0 obj\n${objs[i]}\nendobj\n`; }
+    const xrefStart = pdf.length;
+    pdf += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
+    for (let i = 0; i < objs.length; i++) pdf += String(offsets[i]).padStart(10, '0') + ' 00000 n \n';
+    pdf += `trailer\n<</Size ${objs.length + 1}/Root 1 0 R>>\nstartxref\n${xrefStart}\n%%EOF`;
+    const bytes = new Uint8Array(pdf.length);
+    for (let i = 0; i < pdf.length; i++) bytes[i] = pdf.charCodeAt(i) & 0xff;
+    return bytes;
+  }
+  function procMoney(n) {
+    return Number.isFinite(Number(n)) ? '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '(not entered)';
+  }
+  function procParseQuotes(text) {
+    return pdfSan(text).split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => {
+      const p = l.split(/[,\t]/).map(s => s.trim());
+      return { vendor: p[0] || '', amount: p[1] || '', date: p[2] || '' };
+    });
+  }
+  // Build the selected packet documents (pure) from a decision + the entered fields.
+  function procPacketDocs(d, f) {
+    const docs = [];
+    const money = procMoney(d.amount);
+    const fundLabel = d.fund === 'rcuh' ? 'RCUH (extramural / grant)' : 'UH / State funds';
+    if (f.cover) {
+      const b = [{ t: 'h', text: 'Procurement Request - Cover Sheet' }];
+      b.push({ t: 'kv', k: 'Date', v: f.date }, { t: 'kv', k: 'Requestor', v: f.requestor }, { t: 'kv', k: 'Department / program', v: f.dept },
+        { t: 'kv', k: 'Fund / account', v: f.fundCode }, { t: 'kv', k: 'Vendor', v: f.vendor });
+      b.push({ t: 'kv', k: 'Estimated total', v: money }, { t: 'kv', k: 'Funding source', v: fundLabel }, { t: 'kv', k: 'Purchase type', v: f.typeLabel });
+      b.push({ t: 'rule' }, { t: 'kv', k: 'Method', v: d.method }, { t: 'kv', k: 'System', v: d.system }, { t: 'kv', k: 'Approver', v: d.approver });
+      if (d.routeTo) b.push({ t: 'kv', k: 'Send it to', v: d.routeTo });
+      if (d.coop) {
+        b.push({ t: 'kv', k: 'Buy on contract', v: `${d.coop.ref} - ${d.coop.name}` });
+        if (d.coop.vendors && d.coop.vendors.length) b.push({ t: 'kv', k: 'Contact for quotes', v: d.coop.vendors.join(', ') + (d.coop.quoteVia ? ' — ' + d.coop.quoteVia : '') });
+      }
+      b.push({ t: 'sub', text: 'Business purpose' }, { t: 'para', text: f.purpose || '-' });
+      if (d.gates && d.gates.length) { b.push({ t: 'sub', text: 'Approval gates' }); d.gates.forEach(g => b.push({ t: 'check', text: g, checked: false })); }
+      b.push({ t: 'sub', text: 'Documents to attach' }); (d.docs || []).forEach(x => b.push({ t: 'check', text: x, checked: false }));
+      const forms = procDedupForms(d.forms || []);
+      if (forms.length) { b.push({ t: 'sub', text: 'Forms & references' }); forms.forEach(fm => b.push({ t: 'para', text: `- ${fm.name}: ${fm.url}` })); }
+      b.push({ t: 'gap', h: 8 }, { t: 'sig' });
+      docs.push(b);
+    }
+    if (f.sole) {
+      const b = [{ t: 'h', text: 'Sole Source Justification' }];
+      b.push({ t: 'kv', k: 'Vendor', v: f.vendor }, { t: 'kv', k: 'Estimated total', v: money }, { t: 'kv', k: 'Funding source', v: fundLabel });
+      b.push({ t: 'sub', text: 'Why is this the only practical source?' }, { t: 'para', text: f.soleWhy || '-' });
+      b.push({ t: 'sub', text: 'Unique features / capabilities' }, { t: 'para', text: f.soleUnique || '-' });
+      b.push({ t: 'sub', text: 'Basis for price reasonableness' }, { t: 'para', text: f.solePrice || '-' });
+      b.push({ t: 'gap', h: 6 }, { t: 'para', text: 'Mirrors ' + (d.fund === 'rcuh' ? 'RCUH Attachment 02' : 'UH SPO-001') + ' content; transcribe onto or attach to the official form.' });
+      b.push({ t: 'gap', h: 8 }, { t: 'sig' });
+      docs.push(b);
+    }
+    if (f.quotes) {
+      const b = [{ t: 'h', text: 'Quote / Price Summary' }, { t: 'row', head: true, cols: ['Vendor', 'Amount', 'Date'] }];
+      const rows = f.quoteRows || [];
+      rows.forEach(q => b.push({ t: 'row', cols: [q.vendor, q.amount, q.date] }));
+      if (!rows.length) b.push({ t: 'para', text: '(no quotes entered)' });
+      b.push({ t: 'gap', h: 6 }, { t: 'kv', k: 'Selected vendor', v: f.vendor }, { t: 'kv', k: 'Selected amount', v: money });
+      b.push({ t: 'sub', text: 'Selection rationale' }, { t: 'para', text: f.sole ? 'Sole source - see justification.' : (f.purpose || 'Lowest responsive and responsible quote.') });
+      b.push({ t: 'gap', h: 8 }, { t: 'sig' });
+      docs.push(b);
+    }
+    if (f.checklist) {
+      const b = [{ t: 'h', text: 'RCUH Procurement Checklist' }];
+      [
+        'Procurement method matches the dollar amount (' + (d.method || '') + ')',
+        'Required number of quotes obtained and documented',
+        'Vendor is RCUH-eligible and not debarred',
+        'Sole source justification attached (if applicable)',
+        'Conflict of interest reviewed',
+        'Funds available in the project account',
+        'No goods or services received before the PO was issued',
+        'Independent contractor classification reviewed (services only)',
+        'Required approvals obtained per the dollar threshold',
+      ].forEach(it => b.push({ t: 'check', text: it, checked: false }));
+      b.push({ t: 'gap', h: 6 }, { t: 'para', text: 'Based on RCUH Procurement Checklist (Attachment 28). Verify each item before submitting via the RCUH Financial Portal.' });
+      b.push({ t: 'gap', h: 8 }, { t: 'sig' });
+      docs.push(b);
+    }
+    return docs;
+  }
   function procDedupForms(forms) {
     const seen = new Set();
     return forms.filter(f => f && !seen.has(f.url) && seen.add(f.url));
@@ -3138,7 +3340,18 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     $('procRouteTo').innerHTML = s.routeTo
       ? `<b>Send it to</b><p>${escapeHtml(s.routeTo)}</p>` : '';
     $('procCoop').innerHTML = s.coop
-      ? `<b>Buy on contract</b><p><a href="${escapeAttr(s.coop.url)}" target="_blank" rel="noopener">${escapeHtml(s.coop.ref)}</a> — ${escapeHtml(s.coop.name)}</p>` : '';
+      ? `<b>Buy on contract</b><p><a href="${escapeAttr(s.coop.url)}" target="_blank" rel="noopener">${escapeHtml(s.coop.ref)}</a> — ${escapeHtml(s.coop.name)}</p>`
+        + (s.coop.vendors && s.coop.vendors.length
+            ? `<p class="proc-quoteq"><b>Contact for quotes:</b> ${s.coop.vendors.map(escapeHtml).join(' · ')}</p>`
+              + (s.coop.quoteVia ? `<p class="hint">${escapeHtml(s.coop.quoteVia)}</p>` : '') : '')
+      : '';
+    // Suggest the packet documents that fit this request (the operator can still toggle).
+    if ($('pkDocSole')) {
+      $('pkDocSole').checked = s.sole;
+      $('pkDocQuotes').checked = /quote/i.test(s.method || '');
+      $('pkDocChecklist').checked = s.fund === 'rcuh';
+      if ($('pkSoleWrap')) $('pkSoleWrap').hidden = !s.sole;
+    }
     $('procGates').innerHTML = s.gates.length
       ? `<b>Approval gates — start early</b><ul class="proc-list">${s.gates.map(g => `<li>${escapeHtml(g)}</li>`).join('')}</ul>` : '';
     const forms = procDedupForms(s.forms);
@@ -3149,7 +3362,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   }
   function procurementText() {
     const s = procurementSummary();
-    const amount = Number.isFinite(s.amount) ? `$${s.amount.toFixed(2)}` : 'Not entered';
+    const amount = procMoney(s.amount);
     const forms = procDedupForms(s.forms);
     const lines = [
       'PROCUREMENT PACKET',
@@ -3164,7 +3377,10 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     if (s.system) lines.push(`System: ${s.system}`);
     if (s.approver) lines.push(`Approver: ${s.approver}`);
     if (s.routeTo) lines.push(`Send it to: ${s.routeTo}`);
-    if (s.coop) lines.push(`Buy on contract: ${s.coop.ref} — ${s.coop.name} (${s.coop.url})`);
+    if (s.coop) {
+      lines.push(`Buy on contract: ${s.coop.ref} — ${s.coop.name} (${s.coop.url})`);
+      if (s.coop.vendors && s.coop.vendors.length) lines.push(`Contact for quotes: ${s.coop.vendors.join(', ')}${s.coop.quoteVia ? ' — ' + s.coop.quoteVia : ''}`);
+    }
     if (s.gates.length) lines.push('', 'Approval gates:', ...s.gates.map(g => `- ${g}`));
     if (forms.length) lines.push('', 'Forms & links:', ...forms.map(f => `- ${f.name}: ${f.url}`));
     lines.push('', 'Documents to attach:', ...s.docs.map(d => `- ${d}`));
@@ -3172,9 +3388,33 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     lines.push('', 'Notes:', s.notes || '(none)');
     return lines.join('\n');
   }
+  function procGeneratePacket() {
+    const d = procurementSummary();
+    const today = new Date();
+    const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const f = {
+      date: iso, requestor: procValue('pkRequestor'), dept: procValue('pkDept'), fundCode: procValue('pkFund'),
+      vendor: procValue('pkVendor'), purpose: procValue('pkPurpose'),
+      typeLabel: $('procType').selectedOptions[0].text,
+      soleWhy: procValue('pkSoleWhy'), soleUnique: procValue('pkSoleUnique'), solePrice: procValue('pkSolePrice'),
+      quoteRows: procParseQuotes(procValue('pkQuotes')),
+      cover: procChecked('pkDocCover'), sole: procChecked('pkDocSole'), quotes: procChecked('pkDocQuotes'), checklist: procChecked('pkDocChecklist'),
+    };
+    const docs = procPacketDocs(d, f);
+    if (!docs.length) { $('pkMsg').textContent = 'Pick at least one document to include in the packet.'; return; }
+    const bytes = buildPdf(pdfLayout(docs));
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'Procurement_Packet.pdf';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+    $('pkMsg').textContent = `Packet generated — ${docs.length} document${docs.length > 1 ? 's' : ''} (check your downloads).`;
+  }
   function initProcurement() {
     ['procFund', 'procAmount', 'procType', 'procVendor', 'procQuotes', 'procContract', 'procSole', 'procUrgent', 'procNotes']
       .forEach(id => $(id).addEventListener('input', renderProcurement));
+    if ($('pkGenerate')) $('pkGenerate').onclick = procGeneratePacket;
     $('procCopy').onclick = async () => {
       const text = procurementText();
       try {

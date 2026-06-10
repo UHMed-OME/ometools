@@ -25,7 +25,7 @@ assert.ok(XLSX && XLSX.utils, 'SheetJS failed to load');
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const m = html.match(/<script>\s*([\s\S]*?)<\/script>\s*<\/body>/i);
 assert.ok(m, 'could not locate the app <script> block');
-const appSrc = m[1] + '\n;globalThis.__app = { validate, parseWorkbook, buildWorkbook, parsePasted, solve, defaultWeights, makeExample, resultSheets, procDecide, TEMPLATE, SCHEMA, SHEET_ORDER };';
+const appSrc = m[1] + '\n;globalThis.__app = { validate, parseWorkbook, buildWorkbook, parsePasted, solve, defaultWeights, makeExample, resultSheets, procDecide, procPacketDocs, pdfLayout, buildPdf, TEMPLATE, SCHEMA, SHEET_ORDER };';
 
 // 3. Minimal stubs for the DOM/browser globals referenced at load time.
 const stubEl = () => new Proxy({}, {
@@ -322,5 +322,31 @@ assert.ok(formUrls(p).some(u => /infosec/.test(u)), 'software packet links the D
 p = app.procDecide({ fund: 'uh', type: 'supplies', amount: NaN, vendor: 'uh', quotes: 0 });
 assert.equal(p.method, '', 'no amount yields no method');
 console.log('✓ procurement engine: UH/RCUH thresholds, routing, forms, coop contracts, gates');
+
+// --- Test 18: packet PDF generation (document selection + valid PDF bytes) ---
+const dd = app.procDecide({ fund: 'rcuh', type: 'software', amount: 30000, vendor: 'uh', quotes: 0, sole: true });
+assert.ok(dd.coop && dd.coop.vendors && dd.coop.vendors.length, 'coop contract carries vendor quote contacts');
+const pdocs = app.procPacketDocs(dd, {
+  date: '2026-06-10', requestor: 'Jane Doe', dept: 'OME', fundCode: 'RX123', vendor: 'Carahsoft',
+  purpose: 'Survey platform license', typeLabel: 'Software, subscription, or cloud',
+  soleWhy: 'Only certified vendor', soleUnique: 'Integrates with REDCap', solePrice: 'GSA pricing',
+  quoteRows: [], cover: true, sole: true, quotes: false, checklist: true,
+});
+assert.equal(pdocs.length, 3, 'cover + sole + checklist selected (quote summary omitted)');
+const bytes = app.buildPdf(app.pdfLayout(pdocs));
+assert.ok(bytes && bytes.length > 200 && typeof bytes[0] === 'number', 'buildPdf returns non-trivial byte output');
+const pdfStr = Array.from(bytes).map(c => String.fromCharCode(c)).join('');
+assert.equal(pdfStr.slice(0, 5), '%PDF-', 'starts with the PDF signature');
+assert.ok(pdfStr.includes('%%EOF'), 'terminates with %%EOF');
+assert.ok(/\nxref\n/.test(pdfStr) && pdfStr.includes('/Root 1 0 R'), 'has an xref table + trailer root');
+assert.ok(pdfStr.includes('Sole Source Justification') && pdfStr.includes('RCUH Procurement Checklist'), 'renders the selected document headings');
+assert.ok(pdfStr.includes('Contact for quotes'), 'cover sheet lists who to contact for quotes');
+assert.ok(!pdfStr.includes('Quote / Price Summary'), 'omits the unselected quote summary');
+// byte offsets in the xref must point at real "N 0 obj" markers (offset integrity)
+const xi = pdfStr.indexOf('xref\n');
+const freeEntryStart = pdfStr.indexOf('\n', xi + 5) + 1;     // start of the "0000000000 65535 f " free entry
+const obj1Off = parseInt(pdfStr.slice(freeEntryStart + 20, freeEntryStart + 30), 10); // next 20-byte entry = object 1
+assert.equal(pdfStr.slice(obj1Off, obj1Off + 7), '1 0 obj', 'object-1 xref offset points at object 1');
+console.log('✓ packet generator: selects the right documents and emits a valid PDF with correct offsets');
 
 console.log('\nALL TESTS PASSED');
