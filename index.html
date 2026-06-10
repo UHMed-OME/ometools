@@ -148,7 +148,10 @@
     .proc-gates { padding: 0.6rem 0.7rem; border-radius: 8px; border: 1px solid var(--warn); background: var(--warn-bg); }
     .proc-links { list-style: none; padding-left: 0; display: grid; gap: 0.3rem; }
     .proc-links a, .proc-coop a { color: var(--brand-dark); font-weight: 600; }
-    .proc-quoteq { margin-top: 0.3rem !important; }
+    .proc-quoteq { margin-top: 0.4rem !important; margin-bottom: 0.2rem !important; }
+    .proc-contacts { list-style: none; padding-left: 0; display: grid; gap: 0.15rem; }
+    .proc-contacts li { font-size: 0.86rem; }
+    .proc-contacts a { color: var(--brand-dark); }
     .proc-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
     .proc-packet { margin-top: 1rem; }
     .proc-pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
@@ -3177,19 +3180,53 @@
     rcuhServices:  { name: 'RCUH Services Agreement (2.204)', url: 'https://www.rcuh.com/2-000/2-200/2-204/' },
     opm:           { name: 'UH OPM forms & resources', url: 'https://www.hawaii.edu/procurement/' },
   };
+  // Awarded vendors + Hawaiʻi contacts from the OME Procurement Hub vendor-contacts pages
+  // (SPO Vendor List 24-03 NASPO Computer Equipment, Change 19, May 2026; the at-a-glance
+  // page for the rest). Always confirm the current list on the SPO Price & Vendor Lists page.
   const PROC_COOP = {
     computer: { ref: 'NASPO 24-03', name: 'Computer Equipment (desktops / laptops / servers)', url: 'https://www.naspovaluepoint.org/',
-      vendors: ['Dell', 'HP', 'Lenovo'], quoteVia: 'Request quotes from the awarded NASPO ValuePoint resellers, then process via SuperQuotes.' },
-    software: { ref: 'SPO 17-18',  name: 'NASPO Cloud Solutions', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/',
-      vendors: ['Carahsoft', 'SHI International', 'Insight Public Sector'], quoteVia: 'Email a reseller for a quote citing SPO 17-18.' },
-    lab:      { ref: 'SPO 24-13',  name: 'Lab Equipment & Supplies', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/',
-      vendors: ['Fisher Scientific', 'VWR / Avantor', 'Nikon'], quoteVia: 'Request a contract-priced quote citing SPO 24-13.' },
-    medical:  { ref: 'SPO 24-11',  name: 'MMCAP Medical Products', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/',
-      vendors: ['Henry Schein'], quoteVia: 'Join MMCAP Infuse first (Christopher.J.Amandi@hawaii.gov), then order at member pricing.' },
-    office:   { ref: 'SPO 25-12 / NASPO 23-15', name: 'Office Supplies / Furniture', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/',
-      vendors: ['Office Depot', 'Fisher Hawaii'], quoteVia: 'Order supplies at contract price; for furniture get a dealer quote citing the contract.' },
-    av:       { ref: 'SPO 26-14',  name: 'AV Equipment & Services', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/',
-      vendors: ['B&H Photo Video'], quoteVia: 'Request a quote from B&H Photo Video citing SPO 26-14.' },
+      quoteVia: 'Email a manufacturer rep or a Hawaiʻi reseller and cite contract 24-03 + the vendor’s NASPO Master Agreement #. No separate HCE check when buying on-contract.',
+      contacts: [
+        { name: 'Dell — Heather Morgado (HI AE)', email: 'Heather.Morgado@dell.com', phone: '(808) 352-7954' },
+        { name: 'HP — Alicia Hooper', email: 'Alicia.hooper@hp.com', phone: '(505) 415-7694' },
+        { name: 'Apple — Education / Gov SSO', email: 'EducationSupport@apple.com', phone: '1-800-800-2775' },
+        { name: 'Lenovo — Jackson Tsao', email: 'jtsao@lenovo.com', phone: '(808) 286-4175' },
+        { name: 'CDW-G reseller — HI team', email: 'hawaii@cdwg.com', phone: '(800) 808-4239' },
+        { name: 'SHI reseller — Team Hawaii', email: 'TeamHawaii@SHI.com', phone: '(908) 432-2254' },
+        { name: 'SPO contract POC — Matthew Chow', email: 'matthew.m.chow@hawaii.gov', phone: '(808) 586-0577' },
+      ] },
+    software: { ref: 'SPO 17-18', name: 'NASPO Cloud Solutions (SaaS / IaaS / PaaS)', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/',
+      quoteVia: 'Most SaaS is bought through an aggregator (Carahsoft / SHI / Insight). Cite SPO 17-18 — and start the DGP data-governance review in parallel.',
+      contacts: [
+        { name: 'Carahsoft — Mariah Edwards', email: 'Mariah.Edwards@Carahsoft.com', phone: '(703) 889-9734' },
+        { name: 'SHI — education desk', email: 'HawaiiEDU@shi.com', phone: '' },
+        { name: 'Insight Public Sector', email: 'TeamHawaii@insight.com', phone: '' },
+      ] },
+    lab: { ref: 'SPO 24-13', name: 'Lab Equipment & Supplies', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/',
+      quoteVia: 'Request a contract-priced quote citing SPO 24-13.',
+      contacts: [
+        { name: 'Fisher Scientific — Blaine Hedani', email: '', phone: '(808) 371-3854' },
+        { name: 'VWR / Avantor', email: '', phone: '(808) 420-7374' },
+        { name: 'Nikon / Pacific Star', email: '', phone: '' },
+      ] },
+    medical: { ref: 'SPO 24-11', name: 'MMCAP Medical Products', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/',
+      quoteVia: 'Requires an MMCAP Infuse membership application via SPO first; then order from Henry Schein at member pricing.',
+      contacts: [
+        { name: 'Henry Schein (via MMCAP)', email: '', phone: '' },
+        { name: 'MMCAP membership — Christopher Amandi', email: 'Christopher.J.Amandi@hawaii.gov', phone: '' },
+      ] },
+    office: { ref: 'SPO 25-12 / NASPO 23-15', name: 'Office Supplies / Furniture', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/',
+      quoteVia: 'Order supplies at contract price; for furniture (23-15) get a dealer quote citing the contract.',
+      contacts: [
+        { name: 'Office Depot / ODP', email: '', phone: '' },
+        { name: 'Fisher Hawaii (local)', email: '', phone: '(808) 687-5214' },
+        { name: 'Furniture dealers — CEI Hawaii, Interior Showplace', email: '', phone: '' },
+      ] },
+    av: { ref: 'SPO 26-14', name: 'AV Equipment & Services', url: 'https://spo.hawaii.gov/for-vendors/contract-awards/price-vendor-lists/',
+      quoteVia: 'Request a quote citing SPO 26-14.',
+      contacts: [
+        { name: 'B&H Photo Video — Jon Bernstein', email: 'jbernste@bhphoto.com', phone: '' },
+      ] },
   };
 
   // Pure decision engine: fund + category + amount → method, routing, forms, contract, checklist.
@@ -3353,7 +3390,11 @@
       if (d.routeTo) b.push({ t: 'kv', k: 'Send it to', v: d.routeTo });
       if (d.coop) {
         b.push({ t: 'kv', k: 'Buy on contract', v: `${d.coop.ref} - ${d.coop.name}` });
-        if (d.coop.vendors && d.coop.vendors.length) b.push({ t: 'kv', k: 'Contact for quotes', v: d.coop.vendors.join(', ') + (d.coop.quoteVia ? ' — ' + d.coop.quoteVia : '') });
+        if (d.coop.contacts && d.coop.contacts.length) {
+          b.push({ t: 'sub', text: 'Who to contact for quotes' });
+          d.coop.contacts.forEach(c => b.push({ t: 'para', text: `- ${c.name}${c.email ? '  ' + c.email : ''}${c.phone ? '  ' + c.phone : ''}` }));
+          if (d.coop.quoteVia) b.push({ t: 'para', text: d.coop.quoteVia });
+        }
       }
       b.push({ t: 'sub', text: 'Business purpose' }, { t: 'para', text: f.purpose || '-' });
       if (d.gates && d.gates.length) { b.push({ t: 'sub', text: 'Approval gates' }); d.gates.forEach(g => b.push({ t: 'check', text: g, checked: false })); }
@@ -3416,8 +3457,16 @@
       ? `<b>Send it to</b><p>${escapeHtml(s.routeTo)}</p>` : '';
     $('procCoop').innerHTML = s.coop
       ? `<b>Buy on contract</b><p><a href="${escapeAttr(s.coop.url)}" target="_blank" rel="noopener">${escapeHtml(s.coop.ref)}</a> — ${escapeHtml(s.coop.name)}</p>`
-        + (s.coop.vendors && s.coop.vendors.length
-            ? `<p class="proc-quoteq"><b>Contact for quotes:</b> ${s.coop.vendors.map(escapeHtml).join(' · ')}</p>`
+        + (s.coop.contacts && s.coop.contacts.length
+            ? `<p class="proc-quoteq"><b>Contact for quotes</b></p><ul class="proc-list proc-contacts">`
+              + s.coop.contacts.map(c => {
+                  const bits = [
+                    c.email ? `<a href="mailto:${escapeAttr(c.email)}">${escapeHtml(c.email)}</a>` : '',
+                    c.phone ? `<span class="muted">${escapeHtml(c.phone)}</span>` : '',
+                  ].filter(Boolean).join(' · ');
+                  return `<li>${escapeHtml(c.name)}${bits ? ' — ' + bits : ''}</li>`;
+                }).join('')
+              + `</ul>`
               + (s.coop.quoteVia ? `<p class="hint">${escapeHtml(s.coop.quoteVia)}</p>` : '') : '')
       : '';
     // Suggest the packet documents that fit this request (the operator can still toggle).
@@ -3454,7 +3503,11 @@
     if (s.routeTo) lines.push(`Send it to: ${s.routeTo}`);
     if (s.coop) {
       lines.push(`Buy on contract: ${s.coop.ref} — ${s.coop.name} (${s.coop.url})`);
-      if (s.coop.vendors && s.coop.vendors.length) lines.push(`Contact for quotes: ${s.coop.vendors.join(', ')}${s.coop.quoteVia ? ' — ' + s.coop.quoteVia : ''}`);
+      if (s.coop.contacts && s.coop.contacts.length) {
+        lines.push('Contact for quotes:');
+        s.coop.contacts.forEach(c => lines.push(`  - ${c.name}${c.email ? '  ' + c.email : ''}${c.phone ? '  ' + c.phone : ''}`));
+        if (s.coop.quoteVia) lines.push(`  (${s.coop.quoteVia})`);
+      }
     }
     if (s.gates.length) lines.push('', 'Approval gates:', ...s.gates.map(g => `- ${g}`));
     if (forms.length) lines.push('', 'Forms & links:', ...forms.map(f => `- ${f.name}: ${f.url}`));

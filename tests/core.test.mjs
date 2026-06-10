@@ -325,7 +325,8 @@ console.log('✓ procurement engine: UH/RCUH thresholds, routing, forms, coop co
 
 // --- Test 18: packet PDF generation (document selection + valid PDF bytes) ---
 const dd = app.procDecide({ fund: 'rcuh', type: 'software', amount: 30000, vendor: 'uh', quotes: 0, sole: true });
-assert.ok(dd.coop && dd.coop.vendors && dd.coop.vendors.length, 'coop contract carries vendor quote contacts');
+assert.ok(dd.coop && dd.coop.contacts && dd.coop.contacts.length, 'coop contract carries vendor quote contacts');
+assert.ok(dd.coop.contacts.some(c => /@/.test(c.email || '')), 'quote contacts include email addresses');
 const pdocs = app.procPacketDocs(dd, {
   date: '2026-06-10', requestor: 'Jane Doe', dept: 'OME', fundCode: 'RX123', vendor: 'Carahsoft',
   purpose: 'Survey platform license', typeLabel: 'Software, subscription, or cloud',
@@ -340,7 +341,8 @@ assert.equal(pdfStr.slice(0, 5), '%PDF-', 'starts with the PDF signature');
 assert.ok(pdfStr.includes('%%EOF'), 'terminates with %%EOF');
 assert.ok(/\nxref\n/.test(pdfStr) && pdfStr.includes('/Root 1 0 R'), 'has an xref table + trailer root');
 assert.ok(pdfStr.includes('Sole Source Justification') && pdfStr.includes('RCUH Procurement Checklist'), 'renders the selected document headings');
-assert.ok(pdfStr.includes('Contact for quotes'), 'cover sheet lists who to contact for quotes');
+assert.ok(pdfStr.includes('contact for quotes') || pdfStr.includes('Who to contact for quotes'), 'cover sheet lists who to contact for quotes');
+assert.ok(pdfStr.includes('Mariah.Edwards@Carahsoft.com'), 'cover sheet prints the actual quote-contact email');
 assert.ok(!pdfStr.includes('Quote / Price Summary'), 'omits the unselected quote summary');
 // byte offsets in the xref must point at real "N 0 obj" markers (offset integrity)
 const xi = pdfStr.indexOf('xref\n');
