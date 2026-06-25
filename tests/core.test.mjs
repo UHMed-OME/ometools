@@ -25,7 +25,7 @@ assert.ok(XLSX && XLSX.utils, 'SheetJS failed to load');
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const m = html.match(/<script>\s*([\s\S]*?)<\/script>\s*<\/body>/i);
 assert.ok(m, 'could not locate the app <script> block');
-const appSrc = m[1] + '\n;globalThis.__app = { validate, parseWorkbook, buildWorkbook, parsePasted, solve, defaultWeights, makeExample, resultSheets, procDecide, procPacketDocs, procQuoteEmail, pdfLayout, buildPdf, examParseLog, examBuildVisits, examFindGaps, examFlagPostBreak, examScreen, examReportDocs, examParseResponses, EXAM_EXAMPLE, TEMPLATE, SCHEMA, SHEET_ORDER };';
+const appSrc = m[1] + '\n;globalThis.__app = { validate, parseWorkbook, buildWorkbook, parsePasted, solve, defaultWeights, makeExample, resultSheets, procDecide, procPacketDocs, procQuoteEmail, pdfLayout, buildPdf, examParseLog, examBuildVisits, examFindGaps, examFindDwells, examFlagPostBreak, examExtraSignals, examScreen, examReportDocs, examParseResponses, EXAM_EXAMPLE, TEMPLATE, SCHEMA, SHEET_ORDER };';
 
 // 3. Minimal stubs for the DOM/browser globals referenced at load time.
 const stubEl = () => new Proxy({}, {
@@ -388,20 +388,48 @@ const doubled = app.examParseLog(app.EXAM_EXAMPLE.split('\n').flatMap(l => [l, l
 assert.equal(doubled.events.length, ep.events.length, 'doubled (qId,evt,t) rows are de-duplicated');
 assert.ok(doubled.dupesRemoved > 0, 'reports how many duplicates were collapsed');
 
-const rep = app.examScreen(app.EXAM_EXAMPLE, { gapMin: 4, rapidSec: 8 });
+const rep = app.examScreen(app.EXAM_EXAMPLE, { gapMin: 4, rapidSec: 8, dwellMin: 5 });
 assert.ok(rep.gaps.length >= 1, 'finds the ~9-minute idle gap over the 4-min threshold');
 assert.ok(rep.gaps.some(g => g.durMs >= 8 * 60000), 'longest gap is ~9 minutes');
+assert.ok(rep.gaps.every(g => g.after.evt === 'qsExt'), 'break gaps are between questions (after a qsExt), not time-on-question');
 assert.equal(rep.summary.flagCount, rep.flags.length, 'summary flag count matches');
 // The post-break Q2 revisit changed its answer (rvNum 1→3) → a switch flag.
 const sw = rep.flags.find(f => f.visit.qId === 'Q2' && f.reasons.some(r => r.kind === 'switch'));
 assert.ok(sw, 'flags the post-break answer switch on Q2 (rvNum jumped)');
 // Q5 was answered in 3s after the break → a rapid-answer flag.
 assert.ok(rep.flags.some(f => f.visit.qId === 'Q5' && f.reasons.some(r => r.kind === 'rapid')), 'flags the rapid post-break answer on Q5');
+// The ~6-minute span on Q6 (never left) is a long-dwell signal, NOT a break gap.
+assert.ok(rep.dwells.some(d => d.qId === 'Q6' && d.durMs >= 5 * 60000), 'finds the long in-place dwell on Q6');
+assert.ok(!rep.gaps.some(g => g.before.qId === 'Q6' || g.after.qId === 'Q6'), 'the Q6 dwell is not miscounted as a break gap');
+assert.ok(rep.extra.some(x => x.type === 'dwell' && x.qId === 'Q6'), 'dwell surfaces as an "other" signal');
+assert.equal(rep.summary.reviewCount, rep.flags.length + rep.extra.length, 'review count = post-break flags + other signals');
 // A high threshold suppresses the gap (and thus the flags) — nothing is hardcoded.
-const calm = app.examScreen(app.EXAM_EXAMPLE, { gapMin: 30, rapidSec: 8 });
+const calm = app.examScreen(app.EXAM_EXAMPLE, { gapMin: 30, rapidSec: 8, dwellMin: 30 });
 assert.equal(calm.gaps.length, 0, 'no gaps when the threshold is above the largest idle span');
 assert.equal(calm.flags.length, 0, 'no post-break flags without a qualifying gap');
-console.log(`✓ exam screener: parsed ${ep.events.length} events, found ${rep.gaps.length} gap(s), ${rep.flags.length} flag(s)`);
+assert.equal(calm.dwells.length, 0, 'no dwell signal when the dwell threshold is high');
+console.log(`✓ exam screener: parsed ${ep.events.length} events, ${rep.gaps.length} gap(s), ${rep.flags.length} flag(s), ${rep.dwells.length} dwell(s)`);
+
+// --- Test 20b: change-burst + blank→answered signals on a tailored log ------
+const burstLog = [
+  '5/1/2026 8:00:00 AM [NAVIGATION] {"qId":"A","ans":"{A}","rvNum":1,"evt":"qsEntr","log":1778000000000}',
+  '5/1/2026 8:00:20 AM [NAVIGATION] {"qId":"A","rvNum":1,"evt":"qsExt","log":1778000020000}',
+  '5/1/2026 8:00:20 AM [NAVIGATION] {"qId":"B","ans":"{B}","rvNum":1,"evt":"qsEntr","log":1778000020000}',
+  '5/1/2026 8:00:40 AM [NAVIGATION] {"qId":"B","rvNum":1,"evt":"qsExt","log":1778000040000}',
+  '5/1/2026 8:00:40 AM [NAVIGATION] {"qId":"C","ans":"{}","rvNum":0,"evt":"qsEntr","log":1778000040000}',   // C left blank
+  '5/1/2026 8:00:50 AM [NAVIGATION] {"qId":"C","rvNum":0,"evt":"qsExt","log":1778000050000}',
+  // --- 10-minute gap ---
+  '5/1/2026 8:10:50 AM [NAVIGATION] {"qId":"A","ans":"{X}","rvNum":2,"evt":"qsEntr","log":1778000650000}',  // A changed
+  '5/1/2026 8:11:10 AM [NAVIGATION] {"qId":"A","rvNum":2,"evt":"qsExt","log":1778000670000}',
+  '5/1/2026 8:11:10 AM [NAVIGATION] {"qId":"B","ans":"{Y}","rvNum":2,"evt":"qsEntr","log":1778000670000}',  // B changed
+  '5/1/2026 8:11:30 AM [NAVIGATION] {"qId":"B","rvNum":2,"evt":"qsExt","log":1778000690000}',
+  '5/1/2026 8:11:30 AM [NAVIGATION] {"qId":"C","ans":"{Z}","rvNum":1,"evt":"qsEntr","log":1778000690000}',  // C now answered
+  '5/1/2026 8:11:50 AM [NAVIGATION] {"qId":"C","rvNum":1,"evt":"qsExt","log":1778000710000}',
+].join('\n');
+const br = app.examScreen(burstLog, { gapMin: 4, rapidSec: 1, dwellMin: 30 });
+assert.ok(br.extra.some(x => x.type === 'burst' && x.count >= 2), 'flags a change burst (A and B changed within the window after the gap)');
+assert.ok(br.extra.some(x => x.type === 'blank' && x.qId === 'C'), 'flags blank→answered on C (unanswered before the gap, answered after)');
+console.log('✓ exam screener: change-burst and blank→answered signals fire on a tailored log');
 
 // --- Test 21: exam screener — optional responses CSV join + valid PDF report ---
 const respCsv = 'Question,Response,Correct\nQ2,D,Yes\nQ5,A,No\nQ4,A,Yes';
@@ -410,6 +438,8 @@ assert.ok(respParsed.ok, 'responses CSV with id + correctness columns parses');
 const repC = app.examScreen(app.EXAM_EXAMPLE, { gapMin: 4, rapidSec: 8, responses: respParsed });
 const q2 = repC.flags.find(f => f.visit.qId === 'Q2');
 assert.equal(q2.correct, true, 'Q2 post-break switch is marked correct from the CSV');
+assert.equal(q2.wrongToRight, true, 'Q2 changed-after-break-and-now-correct is flagged as the pattern of interest');
+assert.equal(repC.summary.wrongToRight, 1, 'summary counts the changed→correct pattern');
 // Unmappable CSV degrades gracefully (no crash, ok:false).
 assert.equal(app.examParseResponses('foo,bar\n1,2').ok, false, 'a CSV with no id/correctness column is reported unmapped');
 // PDF report builds and is structurally valid.

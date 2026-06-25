@@ -31,18 +31,33 @@ ExamSoft's *View Exam Snapshot Log* emits one line per event:
 
 ExamSoft commonly emits each event **twice**; the parser de-duplicates identical `(qId, evt, log)` rows.
 
-## 3. What it flags
-1. **Inactivity gaps** — spans between consecutive events `≥` the *break gap threshold*
-   (default 4 min, configurable from the logs faculty keep of real break times).
-2. **Post-break answer activity** — for the visit(s) resuming after a gap:
-   - **switch**: a revisit to an already-seen `qId` whose `rvNum` increased (answer changed after the break);
-   - **rapid**: a visit shorter than the *rapid-answer threshold* (default 8 s) that still recorded an answer (`rvNum > 0`).
-3. **Correctness** *(optional, experimental)* — paste the ExamSoft learner-responses CSV (the
-   same export Elentra's integration imports) to mark whether a changed answer ended up correct.
-   The snapshot log has no correctness data, and the CSV's question key may not match the log's
-   internal `qId`, so the join is best-effort until a real export is mapped. Degrades to "unknown".
+A key distinction underlies the signals: a long span **between** questions (after a `qsExt`,
+before the next `qsEntr`) is *idle with nothing open* — a **break candidate**. A long span
+**inside** a question (`qsEntr` → its `qsExt`) is a **dwell** — the student never left the
+question. These are computed separately so time-on-question is never miscounted as a break.
 
-Thresholds are **live UI controls** — nothing is hardcoded; raising them suppresses the flags.
+## 3. What it flags
+**Inactivity gaps** — between-question idle spans `≥` the *break gap threshold* (default 4 min,
+configurable from the logs faculty keep of real break times).
+
+**Post-break answer activity** — for the visit(s) resuming after a gap:
+- **switch**: a revisit to an already-seen `qId` whose `rvNum` increased (answer changed after the break);
+- **rapid**: a visit shorter than the *rapid-answer threshold* (default 8 s) that still recorded an answer (`rvNum > 0`).
+
+**Other signals** (`examExtraSignals`):
+- **change burst** — ≥ 2 answers changed within a window (default 5 min) of resuming after a gap; a flurry of edits beats a single change.
+- **blank → answered** — a question unanswered before a gap (`rvNum` 0) that gets answered after returning.
+- **long in-place dwell** — a single question open `≥` the *dwell threshold* (default 5 min) without leaving; covers both look-ups that need no break and in-question absences (the log can't tell them apart).
+
+**Correctness** *(optional, experimental)* — paste the ExamSoft learner-responses CSV (the same
+export Elentra's integration imports). A post-break **switch** whose answer is now correct is
+highlighted as **changed → correct** (`wrongToRight`) — the specific pattern Jason described. The
+snapshot log has no correctness data, and the CSV's question key may not match the log's internal
+`qId`, so the join is best-effort until a real export is mapped. Degrades to "unknown".
+
+Thresholds (gap / rapid / dwell) are **live UI controls** — nothing is hardcoded; raising them
+suppresses the corresponding signals. The report leads with a one-line **verdict** (N signals to
+review) and groups the detail into collapsible sections, so the first screen isn't a wall of tables.
 
 ## 4. Output
 - Summary cards (exam span, gaps over threshold, longest gap, post-break flags, questions seen).
@@ -53,11 +68,13 @@ Thresholds are **live UI controls** — nothing is hardcoded; raising them suppr
 
 ## 5. Architecture (where things live in `index.html`)
 - **Pure engine** (no DOM, headlessly tested): `examParseLog` → `examBuildVisits` /
-  `examFindGaps` / `examFlagPostBreak`, `examParseResponses`, `examScreen` (the entry point),
-  and `examReportDocs` (PDF blocks). Plus `EXAM_EXAMPLE` (synthetic demo log) and helpers
-  `examFmtDur` / `examFmtClock`.
-- **DOM wiring**: `initExam` / `examRun` / `examRender` / `examDownloadPdf`, gated on `document.body`
-  like the other tools so the headless test skips it.
+  `examFindGaps` (between-question breaks) / `examFindDwells` (in-question dwells) /
+  `examFlagPostBreak` / `examExtraSignals` (burst, blank→answered, dwell), `examParseResponses`,
+  `examScreen` (the entry point), and `examReportDocs` (PDF blocks). Plus `EXAM_EXAMPLE`
+  (synthetic demo log) and helpers `examFmtDur` / `examFmtClock`.
+- **DOM wiring**: `initExam` / `examRun` / `examRender` (verdict + collapsible accordion) /
+  `examShowInput` (collapse the input to a one-line bar after a screen) / `examReset` /
+  `examDownloadPdf`, gated on `document.body` like the other tools so the headless test skips it.
 - **Registry**: one `TOOLS` entry (`id: 'exam'`, `icon: 'clock'`) + the `#tool-exam` panel.
 - **Tests**: `tests/core.test.mjs` exercises parse/dedupe, gap detection, both post-break flag
   kinds, threshold suppression, the responses join, and PDF validity.

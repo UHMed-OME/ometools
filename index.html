@@ -1034,6 +1034,36 @@
         #tool-exam .pill { display: inline-block; font-size: 0.72rem; padding: 0.05rem 0.45rem; border-radius: 999px; border: 1px solid currentColor; }
         #tool-exam .pill.sw { color: #b3261e; } #tool-exam .pill.rapid { color: #b06a00; } #tool-exam .pill.ok { color: #1a7f37; } #tool-exam .pill.unk { color: #5a6b62; }
         #tool-exam .exam-note { font-size: 0.78rem; color: var(--muted, #5a6b62); border-left: 3px solid var(--accent, #0a9a44); padding: 0.4rem 0.8rem; background: var(--bg, #f4f7f5); border-radius: 0 8px 8px 0; margin-top: 1rem; }
+        #tool-exam .exam-primary { border-color: var(--accent, #0a9a44); }
+        #tool-exam .exam-more { margin: 0.7rem 0; border: 1px solid var(--line); border-radius: 10px; background: var(--card, #fff); }
+        #tool-exam .exam-more > summary { cursor: pointer; padding: 0.6rem 0.9rem; font-size: 0.85rem; font-weight: 600; color: var(--brand, #024731); list-style: none; }
+        #tool-exam .exam-more > summary::-webkit-details-marker { display: none; }
+        #tool-exam .exam-more > summary::before { content: '▸ '; color: var(--muted, #5a6b62); }
+        #tool-exam .exam-more[open] > summary::before { content: '▾ '; }
+        #tool-exam .exam-more > summary:hover { background: var(--bg, #f4f7f5); border-radius: 10px; }
+        #tool-exam .exam-more .exam-card { border: 0; padding-top: 0.2rem; }
+        #tool-exam .exam-dim { font-weight: 400; color: var(--muted, #5a6b62); }
+        #tool-exam .exam-go { margin-top: 0.9rem; }
+        #tool-exam .exam-go .iconbtn.primary { height: 42px; padding: 0 1.4rem; font-size: 0.95rem; }
+        #tool-exam .exam-loaded { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; padding: 0.6rem 0.9rem; margin-bottom: 0.4rem;
+          border: 1px solid var(--line); border-radius: 10px; background: var(--bg, #f4f7f5); }
+        #tool-exam .exam-loaded[hidden] { display: none; }
+        #tool-exam .exam-loaded-info { font-size: 0.85rem; color: var(--brand, #024731); margin-right: auto; }
+        #tool-exam .exam-verdict { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; padding: 0.7rem 1rem; border-radius: 10px; margin-bottom: 0.9rem; border: 1px solid var(--line); }
+        #tool-exam .exam-verdict.flag { background: #fdeceb; border-color: #f3c9c6; }
+        #tool-exam .exam-verdict.warn { background: #fff6e6; border-color: #f0dcae; }
+        #tool-exam .exam-verdict.ok { background: #ecf7ef; border-color: #c7e6cf; }
+        #tool-exam .exam-verdict .v-head { font-size: 1.05rem; font-weight: 700; }
+        #tool-exam .exam-verdict.flag .v-head { color: #b3261e; } #tool-exam .exam-verdict.warn .v-head { color: #8a5a00; } #tool-exam .exam-verdict.ok .v-head { color: #1a7f37; }
+        #tool-exam .exam-verdict .v-sub { font-size: 0.82rem; color: var(--muted, #5a6b62); }
+        #tool-exam .exam-acc { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 0.6rem; background: var(--card, #fff); }
+        #tool-exam .exam-acc > summary { cursor: pointer; padding: 0.6rem 0.9rem; font-size: 0.9rem; font-weight: 600; color: var(--brand, #024731); list-style: none; }
+        #tool-exam .exam-acc > summary::-webkit-details-marker { display: none; }
+        #tool-exam .exam-acc > summary::before { content: '▸ '; color: var(--muted, #5a6b62); }
+        #tool-exam .exam-acc[open] > summary::before { content: '▾ '; }
+        #tool-exam .exam-acc > summary .count { color: var(--muted, #5a6b62); font-weight: 400; }
+        #tool-exam .exam-acc .acc-body { padding: 0 0.9rem 0.6rem; }
+        #tool-exam .exam-note { font-size: 0.78rem; color: var(--muted, #5a6b62); border-left: 3px solid var(--accent, #0a9a44); padding: 0.4rem 0.8rem; background: var(--bg, #f4f7f5); border-radius: 0 8px 8px 0; margin-top: 1rem; }
         @media (max-width: 760px) { #tool-exam .exam-grid { grid-template-columns: 1fr; } }
       </style>
       <section id="tool-exam" class="tool-panel" hidden>
@@ -1045,10 +1075,11 @@
         </header>
 
         <div class="exam-wrap">
-          <div class="exam-grid">
-            <div class="exam-card">
-              <h2>1 · Snapshot log</h2>
-              <p class="hint">Paste the ExamSoft <em>View Exam Snapshot Log</em> text, or open a saved <code>.txt/.log</code>. One student per log. Nothing is uploaded — it is parsed in your browser.</p>
+          <!-- Stage 1: paste a log. The key + thresholds are tucked away so the first screen is just one box. -->
+          <div id="examInputFull">
+            <div class="exam-card exam-primary">
+              <h2>Paste the exam snapshot log</h2>
+              <p class="hint">From ExamSoft → <em>View Exam Snapshot Log</em>. One student per log. Nothing is uploaded — it’s parsed in your browser.</p>
               <textarea id="examLog" class="exam-ta" placeholder="4/27/2026 9:09:08 AM [NAVIGATION] {&quot;qId&quot;:&quot;lnxp…&quot;,&quot;ans&quot;:&quot;{}&quot;,&quot;rvNum&quot;:0,&quot;evt&quot;:&quot;qsEntr&quot;,&quot;log&quot;:1777280948044}"></textarea>
               <div class="exam-actions">
                 <input type="file" id="examLogFile" accept=".txt,.log,.csv,.json" hidden>
@@ -1056,34 +1087,43 @@
                 <button class="iconbtn" id="examExample" title="Load a small example log">Try example</button>
               </div>
             </div>
-            <div class="exam-card">
-              <h2>2 · Answer key / responses <span style="font-weight:400;font-size:0.78rem;color:var(--muted,#5a6b62)">(optional)</span></h2>
-              <p class="hint">Paste the ExamSoft learner-responses CSV (the same export Elentra imports) to mark whether quickly-changed answers ended up correct. Experimental — join is best-effort until a real export is mapped.</p>
-              <textarea id="examResp" class="exam-ta" placeholder="Optional: paste the responses CSV here (Question, Response, Correct…)"></textarea>
-              <div class="exam-actions">
-                <input type="file" id="examRespFile" accept=".csv,.txt" hidden>
-                <button class="iconbtn" id="examRespOpen" title="Open a responses CSV">Open CSV…</button>
+
+            <details class="exam-more" id="examKeyWrap">
+              <summary>Add answer key / responses <span class="exam-dim">— optional, marks whether changed answers ended up correct</span></summary>
+              <div class="exam-card">
+                <p class="hint">Paste the ExamSoft learner-responses CSV (the same export Elentra imports). Experimental — best-effort join until a real export is mapped.</p>
+                <textarea id="examResp" class="exam-ta" placeholder="Question, Response, Correct…"></textarea>
+                <div class="exam-actions">
+                  <input type="file" id="examRespFile" accept=".csv,.txt" hidden>
+                  <button class="iconbtn" id="examRespOpen" title="Open a responses CSV">Open CSV…</button>
+                </div>
               </div>
+            </details>
+
+            <details class="exam-more">
+              <summary>Adjust thresholds <span class="exam-dim">— what counts as a break, a rapid answer, a long dwell</span></summary>
+              <div class="exam-controls">
+                <label>Break gap (min)<input type="number" id="examGapMin" min="0.5" step="0.5" value="4"></label>
+                <label>Rapid answer (sec)<input type="number" id="examRapidSec" min="1" step="1" value="8"></label>
+                <label>Long dwell (min)<input type="number" id="examDwellMin" min="1" step="0.5" value="5"></label>
+              </div>
+            </details>
+
+            <div class="exam-actions exam-go">
+              <button class="iconbtn primary" id="examRun">Screen log</button>
+              <span class="exam-msg" id="examMsg"></span>
             </div>
           </div>
 
-          <div class="exam-controls">
-            <label>Break gap threshold (min)
-              <input type="number" id="examGapMin" min="0.5" step="0.5" value="4">
-            </label>
-            <label>Rapid-answer threshold (sec)
-              <input type="number" id="examRapidSec" min="1" step="1" value="8">
-            </label>
-            <button class="iconbtn primary" id="examRun">Screen log</button>
-            <button class="iconbtn" id="examPdf" disabled title="Run a screen first">Save PDF report</button>
-            <span class="exam-msg" id="examMsg"></span>
+          <!-- Stage 2: after a screen, the input collapses to a one-line bar. -->
+          <div id="examLoaded" class="exam-loaded" hidden>
+            <span class="exam-loaded-info" id="examLoadedInfo"></span>
+            <button class="iconbtn" id="examEdit" title="Edit the log / key / thresholds">Edit</button>
+            <button class="iconbtn" id="examNew" title="Clear and start a new log">New</button>
+            <button class="iconbtn primary" id="examPdf" title="Save the report as a PDF">Save PDF report</button>
           </div>
 
           <div class="exam-out" id="examOut" aria-live="polite"></div>
-
-          <div class="exam-note">
-            <strong>How to read this:</strong> a flagged gap only means the iPad was idle (no recorded events) — it is not proof of a break or of misconduct. Post-break answer changes are a pattern to <em>review with the student record</em>, never an automatic accusation. Confirm the meaning of <code>rvNum</code> against a known exam before relying on switch counts.
-          </div>
         </div>
       </section>
       <!-- Future tools mount here as additional .tool-panel sections (hidden until selected). -->
@@ -3552,7 +3592,8 @@
 
   // A small synthetic log used by "Try example" and the headless test. It has
   // one obvious ~9-minute idle gap, then a revisit to Q2 whose answer count
-  // jumps (a post-break switch) plus a fast answer on Q5.
+  // jumps (a post-break switch) plus a fast answer on Q5, and a long ~6-minute
+  // dwell on Q6 at the end (a look-up-in-place signal, no break).
   const EXAM_EXAMPLE = [
     '4/27/2026 9:00:00 AM [NAVIGATION] {"qId":"Q1","ans":"{A}","rvNum":1,"evt":"qsEntr","log":1777280400000}',
     '4/27/2026 9:00:40 AM [NAVIGATION] {"qId":"Q1","rvNum":1,"isfdbk":false,"nts":"","evt":"qsExt","log":1777280440000}',
@@ -3567,6 +3608,9 @@
     '4/27/2026 9:11:37 AM [NAVIGATION] {"qId":"Q5","rvNum":1,"isfdbk":false,"nts":"","evt":"qsExt","log":1777281097000}',
     '4/27/2026 9:11:37 AM [NAVIGATION] {"qId":"Q4","ans":"{A}","rvNum":0,"evt":"qsEntr","log":1777281097000}',
     '4/27/2026 9:12:50 AM [NAVIGATION] {"qId":"Q4","rvNum":2,"isfdbk":false,"nts":"","evt":"qsExt","log":1777281170000}',
+    '4/27/2026 9:12:50 AM [NAVIGATION] {"qId":"Q6","ans":"{}","rvNum":0,"evt":"qsEntr","log":1777281170000}',
+    // --- ~6 minutes on Q6 without leaving (long in-place dwell) ---
+    '4/27/2026 9:18:50 AM [NAVIGATION] {"qId":"Q6","rvNum":1,"isfdbk":false,"nts":"","evt":"qsExt","log":1777281530000}',
   ].join('\n');
 
   function examFmtDur(ms) {
@@ -3645,6 +3689,7 @@
       const v = {
         qId, enterT, exitT, durMs: (exitT - enterT) || 0, rvNum,
         revisit, prevRv, rvDelta: prevRv == null ? null : rvNum - prevRv,
+        ans: (enter && enter.ans) || (exit && exit.ans) || '',
         enterWall: enter && enter.wall, exitWall: exit && exit.wall,
       };
       seenSet.add(qId); lastRvMap.set(qId, rvNum);
@@ -3652,14 +3697,28 @@
     }
   }
 
-  // Inactivity gaps: spans between consecutive events with no activity.
+  // Inactivity gaps (break candidates): idle spans with NO question open —
+  // i.e. after a qsExt, before the next qsEntr. (A long span *inside* a
+  // question is a dwell, not a break — see examFindDwells.)
   function examFindGaps(events, gapMs) {
     const gaps = [];
     for (let i = 1; i < events.length; i++) {
       const a = events[i - 1], b = events[i], d = b.t - a.t;
-      if (d >= gapMs) gaps.push({ startT: a.t, endT: b.t, durMs: d, after: a, before: b });
+      if (a.evt === 'qsExt' && d >= gapMs) gaps.push({ startT: a.t, endT: b.t, durMs: d, after: a, before: b });
     }
     return gaps;
+  }
+
+  // Long in-place dwell / in-question idle: a single question left open for a
+  // long time (qsEntr → its qsExt). Can't tell deep work from an in-question
+  // absence — surfaced as a signal either way.
+  function examFindDwells(events, dwellMs) {
+    const dwells = [];
+    for (let i = 1; i < events.length; i++) {
+      const a = events[i - 1], b = events[i], d = b.t - a.t;
+      if (a.evt === 'qsEntr' && d >= dwellMs) dwells.push({ qId: a.qId || b.qId, startT: a.t, endT: b.t, durMs: d });
+    }
+    return dwells;
   }
 
   // After each gap, look at the resume visit(s) and flag answer switches /
@@ -3692,6 +3751,7 @@
     const head = split(lines[0]).map(h => h.toLowerCase());
     const find = re => head.findIndex(h => re.test(h));
     const idCol = find(/q(uestion)?\s*(id|#|no|num)|item\s*id|qid/) >= 0 ? find(/q(uestion)?\s*(id|#|no|num)|item\s*id|qid/) : find(/question|item/);
+    const keyCol = find(/answer\s*key|correct\s*answer|^key$/);
     const correctCol = find(/correct|is_?correct|right/);
     const scoreCol = find(/score|points|earned/);
     const ansCol = find(/response|answer|selected/);
@@ -3702,9 +3762,33 @@
       let correct = null;
       if (correctCol >= 0) correct = /^(y|yes|true|1|correct)$/i.test(c[correctCol]);
       else if (scoreCol >= 0) { const n = parseFloat(c[scoreCol]); if (Number.isFinite(n)) correct = n > 0; }
-      map.set(c[idCol], { correct, studentAns: ansCol >= 0 ? c[ansCol] : '' });
+      map.set(c[idCol], { correct, studentAns: ansCol >= 0 ? c[ansCol] : '', key: keyCol >= 0 ? c[keyCol] : '' });
     }
     return { ok: map.size > 0, map, idCol: head[idCol], reason: map.size ? '' : 'no usable rows' };
+  }
+
+  // Derived signals beyond the immediate post-break flags (Jason's idea, expanded):
+  //   • change burst   — several answers changed in a window after a gap
+  //   • blank→answered — a question unanswered before a gap, answered after
+  //   • long dwell     — a long time on one question without leaving
+  function examExtraSignals(visits, gaps, dwells, opts) {
+    const burstWinMs = (opts && opts.burstWinMs) || 300000;
+    const out = [];
+    for (const d of dwells)
+      out.push({ type: 'dwell', qId: d.qId, t: d.startT, durMs: d.durMs, severity: 'info',
+        text: `${examFmtDur(d.durMs)} on ${d.qId} without leaving the question (deep work or an in-question absence)` });
+    for (const g of gaps) {
+      const after = visits.filter(v => v.enterT >= g.endT - 1 && v.enterT <= g.endT + burstWinMs);
+      const changed = after.filter(v => v.revisit && v.rvDelta != null && v.rvDelta > 0);
+      if (changed.length >= 2)
+        out.push({ type: 'burst', t: g.endT, durMs: g.durMs, count: changed.length, severity: 'high',
+          text: `${changed.length} answers changed within ${examFmtDur(burstWinMs)} of resuming (${changed.map(v => v.qId).join(', ')})` });
+      for (const v of after)
+        if (v.revisit && v.prevRv === 0 && v.rvNum > 0)
+          out.push({ type: 'blank', qId: v.qId, t: v.enterT, durMs: g.durMs, severity: 'high',
+            text: `${v.qId} was unanswered before the gap and answered after returning` });
+    }
+    return out;
   }
 
   // Top-level screen: text + options → a structured report object.
@@ -3712,27 +3796,35 @@
     opts = opts || {};
     const gapMs = (opts.gapMin != null ? opts.gapMin : 4) * 60000;
     const rapidMs = (opts.rapidSec != null ? opts.rapidSec : 8) * 1000;
+    const dwellMs = (opts.dwellMin != null ? opts.dwellMin : 5) * 60000;
+    const burstWinMs = (opts.burstWinMin != null ? opts.burstWinMin : 5) * 60000;
     const parsed = examParseLog(text);
     const events = parsed.events;
     const visits = examBuildVisits(events);
     const gaps = examFindGaps(events, gapMs);
+    const dwells = examFindDwells(events, dwellMs);
     const flags = examFlagPostBreak(visits, gaps, { rapidMs });
     const responses = opts.responses && opts.responses.ok ? opts.responses : null;
     if (responses) for (const f of flags) {
       const r = responses.map.get(f.visit.qId);
       f.correct = r ? r.correct : null;
+      // The pattern of interest: an answer changed after a break that is now correct.
+      if (f.correct === true && f.reasons.some(x => x.kind === 'switch')) f.wrongToRight = true;
     }
+    const extra = examExtraSignals(visits, gaps, dwells, { burstWinMs });
     const span = events.length ? events[events.length - 1].t - events[0].t : 0;
     const idle = gaps.reduce((n, g) => n + g.durMs, 0);
     const longest = gaps.reduce((m, g) => Math.max(m, g.durMs), 0);
+    const wrongToRight = flags.filter(f => f.wrongToRight).length;
     return {
-      events, visits, gaps, flags, responses,
+      events, visits, gaps, dwells, flags, extra, responses,
       parseErrors: parsed.errors.length, dupesRemoved: parsed.dupesRemoved,
-      opts: { gapMs, rapidMs },
+      opts: { gapMs, rapidMs, dwellMs, burstWinMs },
       summary: {
         eventCount: events.length, questionCount: new Set(visits.map(v => v.qId)).size,
         spanMs: span, activeMs: Math.max(0, span - idle), idleMs: idle,
-        gapCount: gaps.length, longestGapMs: longest, flagCount: flags.length,
+        gapCount: gaps.length, longestGapMs: longest,
+        flagCount: flags.length, extraCount: extra.length, reviewCount: flags.length + extra.length, wrongToRight,
         startWall: events[0] ? examFmtClock(events[0]) : '—', endWall: events[events.length - 1] ? examFmtClock(events[events.length - 1]) : '—',
       },
     };
@@ -3745,31 +3837,36 @@
     b.push({ t: 'kv', k: 'Exam', v: meta.exam || '(not entered)' });
     b.push({ t: 'kv', k: 'Student', v: meta.student || '(not entered)' });
     b.push({ t: 'kv', k: 'Generated', v: meta.date || '' });
+    b.push({ t: 'kv', k: 'Signals to review', v: String(s.reviewCount) });
     b.push({ t: 'rule' });
     b.push({ t: 'sub', text: 'Summary' });
     b.push({ t: 'kv', k: 'Window', v: `${s.startWall} – ${s.endWall}` });
     b.push({ t: 'kv', k: 'Total span', v: examFmtDur(s.spanMs) });
-    b.push({ t: 'kv', k: 'Idle (flagged gaps)', v: `${examFmtDur(s.idleMs)} across ${s.gapCount} gap(s)` });
+    b.push({ t: 'kv', k: 'Idle (break gaps)', v: `${examFmtDur(s.idleMs)} across ${s.gapCount} gap(s)` });
     b.push({ t: 'kv', k: 'Longest gap', v: examFmtDur(s.longestGapMs) });
     b.push({ t: 'kv', k: 'Questions seen', v: String(s.questionCount) });
-    b.push({ t: 'kv', k: 'Post-break flags', v: String(s.flagCount) });
-    b.push({ t: 'kv', k: 'Thresholds', v: `gap ≥ ${examFmtDur(report.opts.gapMs)}, rapid ≤ ${examFmtDur(report.opts.rapidMs)}` });
+    b.push({ t: 'kv', k: 'Thresholds', v: `gap ≥ ${examFmtDur(report.opts.gapMs)}, rapid ≤ ${examFmtDur(report.opts.rapidMs)}, dwell ≥ ${examFmtDur(report.opts.dwellMs)}` });
 
     b.push({ t: 'sub', text: `Inactivity gaps (${report.gaps.length})` });
-    b.push({ t: 'row', head: true, cols: ['Start → end', 'Duration', 'Between'] });
-    if (!report.gaps.length) b.push({ t: 'para', text: 'No gaps over the threshold.' });
+    b.push({ t: 'row', head: true, cols: ['Left at → resumed', 'Duration', 'Between'] });
+    if (!report.gaps.length) b.push({ t: 'para', text: 'No idle gaps over the threshold.' });
     report.gaps.forEach(g => b.push({ t: 'row', cols: [`${examFmtClock(g.after)} → ${examFmtClock(g.before)}`, examFmtDur(g.durMs), `${g.after.qId || '—'} → ${g.before.qId || '—'}`] }));
 
     b.push({ t: 'sub', text: `Post-break answer activity (${report.flags.length})` });
     b.push({ t: 'row', head: true, cols: ['Question', 'After gap', 'What happened'] });
     if (!report.flags.length) b.push({ t: 'para', text: 'No answer switches or rapid answers right after a gap.' });
     report.flags.forEach(f => {
-      const corr = f.correct === true ? ' [now CORRECT]' : f.correct === false ? ' [incorrect]' : '';
+      const corr = f.wrongToRight ? ' [changed -> now CORRECT]' : f.correct === false ? ' [incorrect]' : '';
       b.push({ t: 'row', cols: [f.visit.qId, examFmtDur(f.gap.durMs), f.reasons.map(r => r.text).join('; ') + corr] });
     });
 
+    b.push({ t: 'sub', text: `Other signals (${report.extra.length})` });
+    b.push({ t: 'row', head: true, cols: ['Type', 'Question', 'What happened'] });
+    if (!report.extra.length) b.push({ t: 'para', text: 'No additional signals.' });
+    report.extra.forEach(x => b.push({ t: 'row', cols: [x.type, x.qId || '—', x.text] }));
+
     b.push({ t: 'gap', h: 6 });
-    b.push({ t: 'para', text: 'Screening aid only. A gap indicates iPad inactivity (no recorded events), not proof of a break or misconduct. Post-break answer changes are a pattern for human review alongside the full record. Confirm rvNum semantics against a known exam before relying on switch counts.' });
+    b.push({ t: 'para', text: 'Screening aid only. A gap indicates iPad inactivity (no recorded events), not proof of a break or misconduct. Post-break changes, bursts, and long dwells are patterns for human review alongside the full record. Confirm rvNum semantics against a known exam before relying on switch counts.' });
     return [b];
   }
 
@@ -4104,49 +4201,79 @@
     fr.onload = () => { $(into).value = String(fr.result || ''); };
     fr.readAsText(file);
   }
+  const examPill = (kind, label) => `<span class="pill ${kind}">${escapeHtml(label)}</span>`;
+  function examAcc(title, count, open, body) {
+    return `<details class="exam-acc"${open ? ' open' : ''}><summary>${escapeHtml(title)} <span class="count">(${count})</span></summary><div class="acc-body">${body}</div></details>`;
+  }
   function examRender(report) {
     const s = report.summary, esc = escapeHtml;
+
+    // Headline verdict — one glance: anything to look at, and how serious.
+    const rc = s.reviewCount;
+    const sev = (s.flagCount || report.extra.some(x => x.severity === 'high')) ? 'flag' : (rc > 0 ? 'warn' : 'ok');
+    const head = rc > 0 ? `⚑ ${rc} signal${rc > 1 ? 's' : ''} to review` : '✓ Nothing unusual stood out';
+    const sub = `${examFmtDur(s.spanMs)} exam · ${s.gapCount} break gap${s.gapCount === 1 ? '' : 's'} · ${s.flagCount} post-break · ${s.extraCount} other` + (s.wrongToRight ? ` · ${s.wrongToRight} changed→correct` : '');
+    let html = `<div class="exam-verdict ${sev}"><span class="v-head">${esc(head)}</span><span class="v-sub">${esc(sub)}</span></div>`;
+
+    // Compact stat chips.
     const stat = (n, k, cls) => `<div class="stat ${cls || ''}"><div class="n">${esc(String(n))}</div><div class="k">${esc(k)}</div></div>`;
-    let html = '<div class="exam-cards">' +
+    html += '<div class="exam-cards">' +
       stat(examFmtDur(s.spanMs), 'Exam span', '') +
-      stat(s.gapCount, 'Gaps over threshold', s.gapCount ? 'warn' : '') +
+      stat(s.gapCount, 'Break gaps', s.gapCount ? 'warn' : '') +
       stat(examFmtDur(s.longestGapMs), 'Longest gap', s.longestGapMs ? 'warn' : '') +
       stat(s.flagCount, 'Post-break flags', s.flagCount ? 'flag' : '') +
-      stat(s.questionCount, 'Questions seen', '') + '</div>';
+      stat(s.extraCount, 'Other signals', s.extraCount ? 'warn' : '') + '</div>';
 
-    html += '<div class="exam-sec"><h3>Inactivity gaps</h3>';
-    if (!report.gaps.length) html += '<p class="hint">None over the threshold.</p>';
+    // Inactivity gaps.
+    let gapsBody;
+    if (!report.gaps.length) gapsBody = '<p class="hint">No idle gaps over the threshold.</p>';
     else {
-      html += '<table class="exam-tbl"><thead><tr><th>Left at</th><th>Resumed</th><th>Duration</th><th>Between questions</th></tr></thead><tbody>';
-      report.gaps.forEach(g => { html += `<tr class="row-gap"><td>${esc(examFmtClock(g.after))}</td><td>${esc(examFmtClock(g.before))}</td><td>${esc(examFmtDur(g.durMs))}</td><td>${esc((g.after.qId || '—') + ' → ' + (g.before.qId || '—'))}</td></tr>`; });
-      html += '</tbody></table>';
+      gapsBody = '<table class="exam-tbl"><thead><tr><th>Left at</th><th>Resumed</th><th>Duration</th><th>Between questions</th></tr></thead><tbody>' +
+        report.gaps.map(g => `<tr class="row-gap"><td>${esc(examFmtClock(g.after))}</td><td>${esc(examFmtClock(g.before))}</td><td>${esc(examFmtDur(g.durMs))}</td><td>${esc((g.after.qId || '—') + ' → ' + (g.before.qId || '—'))}</td></tr>`).join('') +
+        '</tbody></table>';
     }
-    html += '</div>';
+    html += examAcc('Inactivity gaps', report.gaps.length, !!report.gaps.length, gapsBody);
 
-    html += '<div class="exam-sec"><h3>Post-break answer activity</h3>';
-    if (!report.flags.length) html += '<p class="hint">No answer switches or rapid answers right after a gap.</p>';
+    // Post-break answer activity.
+    let pbBody;
+    if (!report.flags.length) pbBody = '<p class="hint">No answer switches or rapid answers right after a gap.</p>';
     else {
-      html += '<table class="exam-tbl"><thead><tr><th>Question</th><th>After gap</th><th>Signal</th><th>What happened</th><th>Correct now?</th></tr></thead><tbody>';
-      report.flags.forEach(f => {
-        const pills = f.reasons.map(r => `<span class="pill ${r.kind === 'switch' ? 'sw' : 'rapid'}">${r.kind}</span>`).join(' ');
-        const corr = f.correct === true ? '<span class="pill sw">now correct</span>' : f.correct === false ? '<span class="pill ok">incorrect</span>' : '<span class="pill unk">—</span>';
-        html += `<tr class="row-flag"><td>${esc(f.visit.qId)}</td><td>${esc(examFmtDur(f.gap.durMs))}</td><td>${pills}</td><td>${esc(f.reasons.map(r => r.text).join('; '))}</td><td>${corr}</td></tr>`;
-      });
-      html += '</tbody></table>';
+      pbBody = '<table class="exam-tbl"><thead><tr><th>Question</th><th>After gap</th><th>Signal</th><th>What happened</th><th>Correct now?</th></tr></thead><tbody>' +
+        report.flags.map(f => {
+          const pills = f.reasons.map(r => examPill(r.kind === 'switch' ? 'sw' : 'rapid', r.kind)).join(' ');
+          const corr = f.wrongToRight ? examPill('sw', 'changed→correct') : f.correct === false ? examPill('ok', 'incorrect') : examPill('unk', '—');
+          return `<tr class="row-flag"><td>${esc(f.visit.qId)}</td><td>${esc(examFmtDur(f.gap.durMs))}</td><td>${pills}</td><td>${esc(f.reasons.map(r => r.text).join('; '))}</td><td>${corr}</td></tr>`;
+        }).join('') + '</tbody></table>';
     }
-    html += '</div>';
+    html += examAcc('Post-break answer activity', report.flags.length, !!report.flags.length, pbBody);
 
-    html += `<div class="exam-sec"><details><summary style="cursor:pointer;color:var(--brand,#024731);font-size:0.85rem">Full question timeline (${report.visits.length} visits)</summary>`;
-    html += '<table class="exam-tbl"><thead><tr><th>#</th><th>Question</th><th>Entered</th><th>Time on Q</th><th>rvNum</th><th>Note</th></tr></thead><tbody>';
-    report.visits.forEach((v, i) => {
-      const note = v.revisit ? ('revisit' + (v.rvDelta != null && v.rvDelta > 0 ? ` — answer changed (rvNum ${v.prevRv}→${v.rvNum})` : '')) : '';
-      html += `<tr><td>${i + 1}</td><td>${esc(v.qId)}</td><td>${esc(examFmtClock({ wall: v.enterWall, t: v.enterT }))}</td><td>${esc(examFmtDur(v.durMs))}</td><td>${v.rvNum}</td><td>${esc(note)}</td></tr>`;
-    });
-    html += '</tbody></table></details></div>';
+    // Other signals (burst / blank→answered / long dwell).
+    let exBody;
+    if (!report.extra.length) exBody = '<p class="hint">No additional signals.</p>';
+    else {
+      const pillFor = t => t === 'dwell' ? examPill('rapid', 'long dwell') : t === 'burst' ? examPill('sw', 'change burst') : examPill('sw', 'blank→answered');
+      exBody = '<table class="exam-tbl"><thead><tr><th>Signal</th><th>Question</th><th>What happened</th></tr></thead><tbody>' +
+        report.extra.map(x => `<tr class="${x.severity === 'high' ? 'row-flag' : 'row-gap'}"><td>${pillFor(x.type)}</td><td>${esc(x.qId || '—')}</td><td>${esc(x.text)}</td></tr>`).join('') +
+        '</tbody></table>';
+    }
+    html += examAcc('Other signals', report.extra.length, report.extra.some(x => x.severity === 'high'), exBody);
+
+    // Full timeline (collapsed).
+    let tl = '<table class="exam-tbl"><thead><tr><th>#</th><th>Question</th><th>Entered</th><th>Time on Q</th><th>rvNum</th><th>Note</th></tr></thead><tbody>' +
+      report.visits.map((v, i) => {
+        const note = v.revisit ? ('revisit' + (v.rvDelta != null && v.rvDelta > 0 ? ` — answer changed (rvNum ${v.prevRv}→${v.rvNum})` : '')) : '';
+        return `<tr><td>${i + 1}</td><td>${esc(v.qId)}</td><td>${esc(examFmtClock({ wall: v.enterWall, t: v.enterT }))}</td><td>${esc(examFmtDur(v.durMs))}</td><td>${v.rvNum}</td><td>${esc(note)}</td></tr>`;
+      }).join('') + '</tbody></table>';
+    html += examAcc('Full question timeline', report.visits.length, false, tl);
 
     if (report.responses && !report.responses.ok)
       html += '<p class="hint">Responses CSV loaded but could not be joined (no clear question-id + correctness column found) — correctness left blank.</p>';
+    html += '<div class="exam-note"><strong>How to read this:</strong> a flagged gap only means the iPad was idle (no recorded events) — not proof of a break or of misconduct. Post-break changes, bursts, and long dwells are patterns to <em>review with the student record</em>, never an automatic accusation. Confirm what <code>rvNum</code> counts against a known exam before relying on switch counts.</div>';
     $('examOut').innerHTML = html;
+  }
+  function examShowInput(editing) {
+    $('examInputFull').hidden = !editing;
+    $('examLoaded').hidden = editing;
   }
   function examRun() {
     const text = $('examLog').value;
@@ -4156,15 +4283,46 @@
     const report = examScreen(text, {
       gapMin: parseFloat($('examGapMin').value) || 4,
       rapidSec: parseFloat($('examRapidSec').value) || 8,
+      dwellMin: parseFloat($('examDwellMin').value) || 5,
       responses,
     });
-    if (!report.summary.eventCount) { $('examMsg').textContent = 'No [NAVIGATION] events found — is this an ExamSoft snapshot log?'; $('examOut').innerHTML = ''; $('examPdf').disabled = true; return; }
+    if (!report.summary.eventCount) { $('examMsg').textContent = 'No [NAVIGATION] events found — is this an ExamSoft snapshot log?'; $('examOut').innerHTML = ''; return; }
     lastExamReport = report;
     examRender(report);
-    $('examPdf').disabled = false;
+    const dd = report.dupesRemoved ? ` · ${report.dupesRemoved} dup rows collapsed` : '';
     const warn = report.parseErrors ? ` · ${report.parseErrors} line(s) skipped` : '';
-    const dd = report.dupesRemoved ? ` · ${report.dupesRemoved} duplicate rows collapsed` : '';
-    $('examMsg').textContent = `${report.summary.eventCount} events · ${report.summary.gapCount} gap(s) · ${report.summary.flagCount} flag(s)${dd}${warn}.`;
+    $('examLoadedInfo').textContent = `✓ Screened ${report.summary.eventCount} events · ${report.summary.startWall}–${report.summary.endWall}${dd}${warn}`;
+    examShowInput(false);
+    $('examMsg').textContent = '';
+  }
+  function examReset() {
+    $('examLog').value = ''; $('examResp').value = ''; $('examOut').innerHTML = '';
+    $('examMsg').textContent = ''; lastExamReport = null; examShowInput(true);
+  }
+  function examDownloadPdf() {
+    if (!lastExamReport) return;
+    let date = ''; try { date = new Date().toLocaleString(); } catch (e) {}
+    const docs = examReportDocs(lastExamReport, { date });
+    const bytes = buildPdf(pdfLayout(docs, { headerLabel: 'Exam activity screen' }));
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'Exam_Activity_Screen.pdf';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+    if (typeof toast === 'function') toast('Report saved to your downloads.');
+  }
+  function initExam() {
+    if (!$('examRun')) return;
+    $('examRun').onclick = examRun;
+    $('examPdf').onclick = examDownloadPdf;
+    $('examEdit').onclick = () => examShowInput(true);
+    $('examNew').onclick = examReset;
+    $('examExample').onclick = () => { $('examLog').value = EXAM_EXAMPLE; examRun(); };
+    $('examOpen').onclick = () => $('examLogFile').click();
+    $('examLogFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if (f) examReadFile(f, 'examLog'); });
+    $('examRespOpen').onclick = () => { const w = $('examKeyWrap'); if (w) w.open = true; $('examRespFile').click(); };
+    $('examRespFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if (f) examReadFile(f, 'examResp'); });
   }
   function examDownloadPdf() {
     if (!lastExamReport) return;
