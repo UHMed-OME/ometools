@@ -25,6 +25,17 @@ SheetJS and the logo are inlined into the single file; nothing loads from a CDN.
 - **Export** — write the assignment back as a per-unit Results sheet + appended history, and
   print/save a PDF roster.
 
+## Other tools in this toolkit
+The same offline shell hosts additional OME tools (pick them from the left sidebar):
+
+- **Procurement Wizard** — a step-by-step guide that turns *what you're buying* + *funding source* + *amount* into the right method, forms, routing, and a generated submission-packet PDF (UH/State and RCUH rules built in). No student data; all client-side.
+- **Exam Break Screener** — parses an ExamSoft **snapshot log** (the per-event `[NAVIGATION]` data, `qsEntr`/`qsExt` with timestamps) to surface, for one student's exam:
+  1. **Inactivity gaps** longer than a configurable break threshold (the iPad sits idle → no events);
+  2. **Post-break answer activity** — a question revisited and *changed* right after a gap (`rvNum` jumped), or answered suspiciously fast on resuming;
+  3. **Correctness** of those changed answers — *optional*, by pasting the ExamSoft learner-responses CSV (the same export Elentra imports); the join is experimental until a real export is mapped.
+
+  It renders a summary + gaps/flags tables and saves a JABSOM-branded **PDF report**. It is a **screening aid for human review, not a verdict** — a gap is only iPad inactivity, not proof of a break or misconduct. The log itself never leaves the browser.
+
 ## Feedback
 Use GitHub Issues to report bugs or request features:
 - [Report a bug](https://github.com/UHMed-OME/ometools/issues/new?template=bug_report.yml)

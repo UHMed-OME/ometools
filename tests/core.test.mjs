@@ -25,7 +25,7 @@ assert.ok(XLSX && XLSX.utils, 'SheetJS failed to load');
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const m = html.match(/<script>\s*([\s\S]*?)<\/script>\s*<\/body>/i);
 assert.ok(m, 'could not locate the app <script> block');
-const appSrc = m[1] + '\n;globalThis.__app = { validate, parseWorkbook, buildWorkbook, parsePasted, solve, defaultWeights, makeExample, resultSheets, procDecide, procPacketDocs, procQuoteEmail, pdfLayout, buildPdf, TEMPLATE, SCHEMA, SHEET_ORDER };';
+const appSrc = m[1] + '\n;globalThis.__app = { validate, parseWorkbook, buildWorkbook, parsePasted, solve, defaultWeights, makeExample, resultSheets, procDecide, procPacketDocs, procQuoteEmail, pdfLayout, buildPdf, examParseLog, examBuildVisits, examFindGaps, examFlagPostBreak, examScreen, examReportDocs, examParseResponses, EXAM_EXAMPLE, TEMPLATE, SCHEMA, SHEET_ORDER };';
 
 // 3. Minimal stubs for the DOM/browser globals referenced at load time.
 const stubEl = () => new Proxy({}, {
@@ -375,5 +375,50 @@ const reqPdf = Array.from(app.buildPdf(app.pdfLayout(reqDocs))).map(c => String.
 assert.ok(reqPdf.includes('Request for Quote') && reqPdf.includes('Heather.Morgado@dell.com'), 'quote-request doc lists the identical recipients');
 assert.ok(!reqPdf.includes('Quote / Price Summary'), 'no price summary when there are no quotes');
 console.log('✓ quotes branch: no quotes → make a request (to all vendors); quotes → summarize');
+
+// --- Test 20: exam screener — parse/dedup, gap detection, post-break flags ---
+const ep = app.examParseLog(app.EXAM_EXAMPLE);
+assert.ok(ep.events.length > 0, 'snapshot log parses into events');
+assert.equal(ep.events.every(e => Number.isFinite(e.t) && e.evt), true, 'events carry a numeric timestamp + evt');
+// Non-NAVIGATION / malformed lines are ignored, not fatal.
+const noisy = app.examParseLog('garbage line\n' + app.EXAM_EXAMPLE + '\n4/27 [NAVIGATION] {not json}');
+assert.equal(noisy.events.length, ep.events.length, 'noise and malformed JSON lines are skipped');
+// Duplicate ExamSoft rows collapse.
+const doubled = app.examParseLog(app.EXAM_EXAMPLE.split('\n').flatMap(l => [l, l]).join('\n'));
+assert.equal(doubled.events.length, ep.events.length, 'doubled (qId,evt,t) rows are de-duplicated');
+assert.ok(doubled.dupesRemoved > 0, 'reports how many duplicates were collapsed');
+
+const rep = app.examScreen(app.EXAM_EXAMPLE, { gapMin: 4, rapidSec: 8 });
+assert.ok(rep.gaps.length >= 1, 'finds the ~9-minute idle gap over the 4-min threshold');
+assert.ok(rep.gaps.some(g => g.durMs >= 8 * 60000), 'longest gap is ~9 minutes');
+assert.equal(rep.summary.flagCount, rep.flags.length, 'summary flag count matches');
+// The post-break Q2 revisit changed its answer (rvNum 1→3) → a switch flag.
+const sw = rep.flags.find(f => f.visit.qId === 'Q2' && f.reasons.some(r => r.kind === 'switch'));
+assert.ok(sw, 'flags the post-break answer switch on Q2 (rvNum jumped)');
+// Q5 was answered in 3s after the break → a rapid-answer flag.
+assert.ok(rep.flags.some(f => f.visit.qId === 'Q5' && f.reasons.some(r => r.kind === 'rapid')), 'flags the rapid post-break answer on Q5');
+// A high threshold suppresses the gap (and thus the flags) — nothing is hardcoded.
+const calm = app.examScreen(app.EXAM_EXAMPLE, { gapMin: 30, rapidSec: 8 });
+assert.equal(calm.gaps.length, 0, 'no gaps when the threshold is above the largest idle span');
+assert.equal(calm.flags.length, 0, 'no post-break flags without a qualifying gap');
+console.log(`✓ exam screener: parsed ${ep.events.length} events, found ${rep.gaps.length} gap(s), ${rep.flags.length} flag(s)`);
+
+// --- Test 21: exam screener — optional responses CSV join + valid PDF report ---
+const respCsv = 'Question,Response,Correct\nQ2,D,Yes\nQ5,A,No\nQ4,A,Yes';
+const respParsed = app.examParseResponses(respCsv);
+assert.ok(respParsed.ok, 'responses CSV with id + correctness columns parses');
+const repC = app.examScreen(app.EXAM_EXAMPLE, { gapMin: 4, rapidSec: 8, responses: respParsed });
+const q2 = repC.flags.find(f => f.visit.qId === 'Q2');
+assert.equal(q2.correct, true, 'Q2 post-break switch is marked correct from the CSV');
+// Unmappable CSV degrades gracefully (no crash, ok:false).
+assert.equal(app.examParseResponses('foo,bar\n1,2').ok, false, 'a CSV with no id/correctness column is reported unmapped');
+// PDF report builds and is structurally valid.
+const exDocs = app.examReportDocs(repC, { exam: 'MD4 Final', student: 'De-identified', date: '2026-06-25' });
+const exBytes = app.buildPdf(app.pdfLayout(exDocs, { headerLabel: 'Exam activity screen' }));
+const exStr = Array.from(exBytes).map(c => String.fromCharCode(c)).join('');
+assert.equal(exStr.slice(0, 5), '%PDF-', 'report starts with the PDF signature');
+assert.ok(exStr.includes('%%EOF') && /\nxref\n/.test(exStr), 'report has xref + EOF');
+assert.ok(exStr.includes('Exam Activity Screen'), 'report renders its heading');
+console.log('✓ exam screener: responses join marks correctness and the PDF report is valid');
 
 console.log('\nALL TESTS PASSED');
