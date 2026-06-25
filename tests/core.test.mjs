@@ -464,4 +464,24 @@ const whoPdf = Array.from(app.buildPdf(app.pdfLayout(whoDocs))).map(c => String.
 assert.ok(whoPdf.includes('STU-12345') && whoPdf.includes('MD4 Final'), 'the report PDF prints the student + exam label');
 console.log('✓ exam screener: taker-ID auto-detection and labeled report');
 
+// --- Test 23: PDF report wraps long cell text within the page (no cutoff) ----
+const longRep = app.examScreen(app.EXAM_EXAMPLE, { gapMin: 4, rapidSec: 8, dwellMin: 5,
+  responses: app.examParseResponses('Question,Response,Correct\nQ2,D,Yes\nQ5,A,No') });
+const longDocs = app.examReportDocs(longRep, {
+  exam: 'MD4 PBL/Lecture Final 2026 (a deliberately long exam name meant to stress text wrapping in the report header and tables)',
+  student: 'Jane Doe (STU-0042)', date: '2026-06-25' });
+const longPages = app.pdfLayout(longDocs, { headerLabel: 'Exam activity screen' });
+const PAGE_RIGHT = 612 - 54;   // page width minus the right margin
+let maxRight = 0;
+const tmRe = /\/F[12] (\d+(?:\.\d+)?) Tf 1 0 0 1 ([\d.]+) [\d.-]+ Tm \(((?:[^()\\]|\\.)*)\) Tj/g;
+for (const pg of longPages) {
+  let mm;
+  while ((mm = tmRe.exec(pg))) {
+    const size = +mm[1], x = +mm[2], txt = mm[3].replace(/\\([()\\])/g, '$1');   // unescape \( \) \\ for true length
+    maxRight = Math.max(maxRight, x + txt.length * size * 0.52);                  // same width estimate pdfWrap uses
+  }
+}
+assert.ok(maxRight <= PAGE_RIGHT, `report text must stay within the page (widest ${maxRight.toFixed(1)} <= ${PAGE_RIGHT})`);
+console.log(`✓ exam report PDF wraps within the page (widest text ends at ${maxRight.toFixed(1)}pt of ${PAGE_RIGHT}pt)`);
+
 console.log('\nALL TESTS PASSED');

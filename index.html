@@ -114,6 +114,12 @@
     .tk-title { display: flex; flex-direction: column; line-height: 1.12; min-width: 0; }
     .tk-title b { font-size: 1rem; font-weight: 700; color: var(--brand-dark); letter-spacing: 0.01em; white-space: nowrap; }
     .tk-title .tk-sub { font-size: 0.74rem; color: var(--muted); white-space: nowrap; }
+    .tk-priv { margin-left: auto; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 0.4rem; cursor: default;
+      padding: 0.28rem 0.7rem; border: 1px solid #c7e6cf; background: #ecf7ef; color: #1a7f37;
+      border-radius: 999px; font-size: 0.76rem; font-weight: 600; white-space: nowrap; }
+    .tk-priv .icon { width: 16px; height: 16px; flex: 0 0 auto; }
+    .tk-priv:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    @media (max-width: 760px) { .tk-priv .tk-priv-txt { display: none; } .tk-priv { padding: 0.28rem 0.45rem; } }
     .tool-actions { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; justify-content: flex-end; }
     .tool-actions[hidden] { display: none; }
     .tool-actions #loadedName { min-width: 0; max-width: 26vw; }
@@ -637,6 +643,13 @@
         <!-- LOGO: relative path; build.mjs inlines it as a data URI for the single file. Never remote. -->
         <span class="tk-logo"><img src="vendor/jabsom-logo.svg" alt="JABSOM"></span>
         <span class="tk-title"><b>Office of Medical Education</b><span class="tk-sub">Web Toolkit</span></span>
+      </div>
+      <!-- Privacy indicator: every tool runs locally; no upload, no cloud, no retention. -->
+      <div class="tk-priv" tabindex="0" role="note"
+           aria-label="Private: runs entirely in your browser. No data is uploaded, and nothing is stored after you close the tab."
+           title="No data leaves this device. Everything runs locally in your browser — no servers, no cloud, no uploads, no tracking. Files you open are processed in memory and nothing is retained after you close the tab. All libraries are bundled into the page, so there are no network calls at runtime.">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.2-2.9 7.7-7 8.9-4.1-1.2-7-4.7-7-8.9V6z"/><path d="M9 12l2 2 4-4"/></svg>
+        <span class="tk-priv-txt">Private &middot; runs in your browser &middot; nothing uploaded</span>
       </div>
     </header>
 
@@ -3576,7 +3589,18 @@
         else if (b.t === 'kv') { const vl = pdfWrap(b.v || '', 11, maxW - 158) || ['']; const n = Math.max(1, vl.length); need(16 * n); put(b.k, M, y - 11, 10.5, true, brand); vl.forEach((ln, i) => put(ln, M + 158, y - 11 - i * 13, 11, false)); y -= 16 * n; }
         else if (b.t === 'para') { for (const ln of pdfWrap(b.text || '-', 11, maxW)) { need(14); put(ln, M, y - 11, 11, false); y -= 14; } }
         else if (b.t === 'check') { const wl = pdfWrap(b.text, 11, maxW - 26); const n = Math.max(1, wl.length); need(14 * n + 2); strokeRect(M, y - 13, 9, 9, accent, 0.8); if (b.checked) put('X', M + 1.5, y - 12, 8.5, true, brand); wl.forEach((ln, i) => put(ln, M + 26, y - 11 - i * 13, 11, false)); y -= 14 * n + 2; }
-        else if (b.t === 'row') { const w = [maxW * 0.5, maxW * 0.28]; const xs = [M + 8, M + w[0] + 8, M + w[0] + w[1] + 8]; need(18); if (b.head) fillRect(M, y - 16, maxW, 18, light); b.cols.forEach((c, i) => put(String(c == null ? '' : c), xs[i], y - 11, 10, !!b.head, b.head ? brand : text)); y -= 14; line(M, y + 1, PW - M, rule); y -= 4; }
+        else if (b.t === 'row') {
+          // Column weights (default favors a wide first column); cells wrap to their width so long text never runs off the page.
+          const cw = (b.w || [0.5, 0.28, 0.22]).map(f => maxW * f);
+          const xs = []; let acc = M; for (const c of cw) { xs.push(acc + 8); acc += c; }
+          const cells = (b.cols || []).map((c, i) => { const ls = pdfWrap(String(c == null ? '' : c), 10, (cw[i] || maxW) - 12); return ls.length ? ls : ['']; });
+          const nlines = Math.max(1, ...cells.map(c => c.length));
+          const rowH = nlines * 12 + 4;
+          need(rowH + 2);
+          if (b.head) fillRect(M, y - rowH + 4, maxW, rowH, light);
+          cells.forEach((ls, i) => ls.forEach((ln, j) => put(ln, xs[i], y - 11 - j * 12, 10, !!b.head, b.head ? brand : text)));
+          y -= rowH; line(M, y + 1, PW - M, rule); y -= 3;
+        }
         else if (b.t === 'rule') { need(8); line(M, y, PW - M, rule); y -= 12; }
         else if (b.t === 'gap') { need(b.h || 10); y -= (b.h || 10); }
         else if (b.t === 'sig') { need(38); y -= 18; line(M + 58, y - 2, M + 282, rule, 0.8); line(M + 340, y - 2, M + 470, rule, 0.8); put('Signature', M, y - 5, 10, true, brand); put('Date', M + 306, y - 5, 10, true, brand); y -= 18; }
@@ -3893,23 +3917,24 @@
     b.push({ t: 'kv', k: 'Questions seen', v: String(s.questionCount) });
     b.push({ t: 'kv', k: 'Thresholds', v: `gap ≥ ${examFmtDur(report.opts.gapMs)}, rapid ≤ ${examFmtDur(report.opts.rapidMs)}, dwell ≥ ${examFmtDur(report.opts.dwellMs)}` });
 
+    const W_GAP = [0.44, 0.16, 0.40], W_PB = [0.16, 0.16, 0.68], W_OT = [0.20, 0.14, 0.66];
     b.push({ t: 'sub', text: `Inactivity gaps (${report.gaps.length})` });
-    b.push({ t: 'row', head: true, cols: ['Left at → resumed', 'Duration', 'Between'] });
+    b.push({ t: 'row', head: true, w: W_GAP, cols: ['Left at → resumed', 'Duration', 'Between'] });
     if (!report.gaps.length) b.push({ t: 'para', text: 'No idle gaps over the threshold.' });
-    report.gaps.forEach(g => b.push({ t: 'row', cols: [`${examFmtClock(g.after)} → ${examFmtClock(g.before)}`, examFmtDur(g.durMs), `${g.after.qId || '—'} → ${g.before.qId || '—'}`] }));
+    report.gaps.forEach(g => b.push({ t: 'row', w: W_GAP, cols: [`${examFmtClock(g.after)} → ${examFmtClock(g.before)}`, examFmtDur(g.durMs), `${g.after.qId || '—'} → ${g.before.qId || '—'}`] }));
 
     b.push({ t: 'sub', text: `Post-break answer activity (${report.flags.length})` });
-    b.push({ t: 'row', head: true, cols: ['Question', 'After gap', 'What happened'] });
+    b.push({ t: 'row', head: true, w: W_PB, cols: ['Question', 'After gap', 'What happened'] });
     if (!report.flags.length) b.push({ t: 'para', text: 'No answer switches or rapid answers right after a gap.' });
     report.flags.forEach(f => {
       const corr = f.wrongToRight ? ' [changed -> now CORRECT]' : f.correct === false ? ' [incorrect]' : '';
-      b.push({ t: 'row', cols: [f.visit.qId, examFmtDur(f.gap.durMs), f.reasons.map(r => r.text).join('; ') + corr] });
+      b.push({ t: 'row', w: W_PB, cols: [f.visit.qId, examFmtDur(f.gap.durMs), f.reasons.map(r => r.text).join('; ') + corr] });
     });
 
     b.push({ t: 'sub', text: `Other signals (${report.extra.length})` });
-    b.push({ t: 'row', head: true, cols: ['Type', 'Question', 'What happened'] });
+    b.push({ t: 'row', head: true, w: W_OT, cols: ['Type', 'Question', 'What happened'] });
     if (!report.extra.length) b.push({ t: 'para', text: 'No additional signals.' });
-    report.extra.forEach(x => b.push({ t: 'row', cols: [x.type, x.qId || '—', x.text] }));
+    report.extra.forEach(x => b.push({ t: 'row', w: W_OT, cols: [x.type, x.qId || '—', x.text] }));
 
     b.push({ t: 'gap', h: 6 });
     b.push({ t: 'para', text: 'Screening aid only. A gap indicates iPad inactivity (no recorded events), not proof of a break or misconduct. Post-break changes, bursts, and long dwells are patterns for human review alongside the full record. Confirm rvNum semantics against a known exam before relying on switch counts.' });
