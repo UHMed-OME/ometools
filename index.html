@@ -1066,6 +1066,20 @@
         #tool-exam .exam-loaded[hidden] { display: none; }
         #tool-exam .exam-loaded-info { font-size: 0.85rem; color: var(--brand, #024731); margin-right: auto; }
         #tool-exam .exam-who { font-size: 0.95rem; font-weight: 700; color: var(--brand, #024731); margin-bottom: 0.4rem; }
+        #tool-exam .exam-tl { margin: 0.3rem 0 1.1rem; }
+        #tool-exam .exam-tl-head { font-size: 0.85rem; font-weight: 600; color: var(--brand, #024731); margin-bottom: 0.5rem; }
+        #tool-exam .exam-tl-track { position: relative; height: 28px; background: #eef3f0; border: 1px solid var(--line); border-radius: 6px; }
+        #tool-exam .exam-tl-gap { position: absolute; top: 0; height: 100%; background: #f6c14b; border-radius: 3px; display: flex; align-items: center; overflow: hidden; }
+        #tool-exam .exam-tl-gap span { font-size: 0.64rem; color: #6b4900; padding-left: 4px; white-space: nowrap; font-weight: 700; }
+        #tool-exam .exam-tl-dwell { position: absolute; top: 0; height: 100%; background: #c7dbf5; border-radius: 3px; }
+        #tool-exam .exam-tl-flag { position: absolute; top: -5px; height: calc(100% + 10px); width: 2px; background: #b3261e; }
+        #tool-exam .exam-tl-flag::after { content: ''; position: absolute; top: -4px; left: -2px; width: 6px; height: 6px; border-radius: 50%; background: #b3261e; }
+        #tool-exam .exam-tl-flag.w2r { background: #8a1a14; }
+        #tool-exam .exam-tl-legend { display: flex; gap: 1.1rem; margin-top: 0.7rem; font-size: 0.72rem; color: var(--muted, #5a6b62); }
+        #tool-exam .exam-tl-legend .lg::before { content: ''; display: inline-block; width: 11px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+        #tool-exam .exam-tl-legend .lg.gap::before { background: #f6c14b; }
+        #tool-exam .exam-tl-legend .lg.dwell::before { background: #c7dbf5; }
+        #tool-exam .exam-tl-legend .lg.flag::before { background: #b3261e; width: 3px; height: 12px; }
         #tool-exam .exam-verdict { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; padding: 0.7rem 1rem; border-radius: 10px; margin-bottom: 0.9rem; border: 1px solid var(--line); }
         #tool-exam .exam-verdict.flag { background: #fdeceb; border-color: #f3c9c6; }
         #tool-exam .exam-verdict.warn { background: #fff6e6; border-color: #f0dcae; }
@@ -1122,6 +1136,7 @@
               <div class="exam-controls">
                 <label class="exam-wide">Exam<input type="text" id="examExam" placeholder="e.g. MD4 PBL/Lecture Final 2026"></label>
                 <label class="exam-wide">Student / taker ID<input type="text" id="examStudent" placeholder="name or ID (one student per log)"></label>
+                <label class="exam-wide">Reviewer<input type="text" id="examReviewer" placeholder="who is running this review (optional)"></label>
               </div>
               <p class="hint">The snapshot log is per-student — you pick the exam-taker in ExamSoft, then view their log. If a log happens to embed an ID, it’s detected and pre-filled here.</p>
             </details>
@@ -3551,6 +3566,11 @@
     }
     return out;
   }
+  // JABSOM crest, pre-rendered to a small JPEG for the PDF letterhead and embedded
+  // via DCTDecode in buildPdf. Browser-only (needs atob to decode); the headless
+  // test omits it and draws the text-only letterhead. w/h are the JPEG pixel dims.
+  const PDF_LOGO = { w: 150, h: 200, b64: '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' };
+
   // Lay a list of documents out into page content streams (each doc starts fresh).
   function pdfLayout(docs, opts) {
     const headerLabel = (opts && opts.headerLabel) || 'Procurement packet';
@@ -3562,13 +3582,22 @@
     const strokeRect = (x, yy, w, h, c, lw = 0.6) => ops.push(`${col(c)} RG ${lw.toFixed(1)} w ${x.toFixed(1)} ${yy.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)} re S`);
     const put = (s, x, yy, size, bold, c = text) => ops.push(`${col(c)} rg BT /${bold ? 'F2' : 'F1'} ${size} Tf 1 0 0 1 ${x.toFixed(1)} ${yy.toFixed(1)} Tm (${pdfEsc(s)}) Tj ET`);
     const line = (x1, yy, x2, c = rule, lw = 0.6) => ops.push(`${col(c)} RG ${lw.toFixed(1)} w ${x1.toFixed(1)} ${yy.toFixed(1)} m ${x2.toFixed(1)} ${yy.toFixed(1)} l S`);
+    const logo = opts && opts.logo;
     const startPage = () => {
       pageNo += 1;
-      fillRect(0, PH - 26, PW, 26, brand);
-      fillRect(0, PH - 30, PW, 4, accent);
-      put('John A. Burns School of Medicine', M, PH - 17, 9.5, true, white);
-      put(headerLabel, PW - M - Math.min(180, headerLabel.length * 5.2), PH - 17, 9.5, false, white);
-      y = PH - 58;
+      // Letterhead: JABSOM crest at left, the OME / Web Toolkit wordmark, the report
+      // label at right, and a green accent rule beneath.
+      let tx = M;
+      if (logo) {
+        const lh = 40, lw = lh * (logo.w / logo.h);
+        ops.push(`q ${lw.toFixed(1)} 0 0 ${lh.toFixed(1)} ${M.toFixed(1)} ${(PH - 8 - lh).toFixed(1)} cm /Logo Do Q`);
+        tx = M + lw + 12;
+      }
+      put('John A. Burns School of Medicine', tx, PH - 24, 12, true, brand);
+      put('Office of Medical Education  |  Web Toolkit', tx, PH - 37, 9, false, muted);
+      put(headerLabel, PW - M - Math.min(150, headerLabel.length * 5.0), PH - 24, 9.5, false, accent);
+      fillRect(M, PH - 50, PW - 2 * M, 1.6, accent);
+      y = PH - 66;
     };
     const finishPage = () => {
       line(M, 40, PW - M, rule, 0.5);
@@ -3604,22 +3633,69 @@
         else if (b.t === 'rule') { need(8); line(M, y, PW - M, rule); y -= 12; }
         else if (b.t === 'gap') { need(b.h || 10); y -= (b.h || 10); }
         else if (b.t === 'sig') { need(38); y -= 18; line(M + 58, y - 2, M + 282, rule, 0.8); line(M + 340, y - 2, M + 470, rule, 0.8); put('Signature', M, y - 5, 10, true, brand); put('Date', M + 306, y - 5, 10, true, brand); y -= 18; }
+        else if (b.t === 'banner') {
+          const bg = b.sev === 'flag' ? [0.99, 0.93, 0.92] : b.sev === 'warn' ? [1, 0.97, 0.90] : [0.92, 0.97, 0.94];
+          const fg = b.sev === 'flag' ? [0.70, 0.15, 0.12] : b.sev === 'warn' ? [0.55, 0.36, 0] : [0.10, 0.50, 0.22];
+          const bH = b.sub ? 38 : 28; need(bH + 8);
+          fillRect(M, y - bH, maxW, bH, bg); fillRect(M, y - bH, 4, bH, fg);
+          put(b.head, M + 14, y - 18, 13, true, fg);
+          if (b.sub) put(b.sub, M + 14, y - 31, 9, false, muted);
+          y -= bH + 10;
+        }
+        else if (b.t === 'cards') {
+          const items = b.items || [], n = Math.max(1, items.length), g = 7, cw = (maxW - g * (n - 1)) / n, ch = 40;
+          need(ch + 8);
+          items.forEach((it, i) => { const cx = M + i * (cw + g); strokeRect(cx, y - ch, cw, ch, rule, 0.8);
+            put(String(it.n), cx + 8, y - 22, 14, true, it.hl ? [0.70, 0.15, 0.12] : brand);
+            put(String(it.k), cx + 8, y - 33, 7.5, false, muted); });
+          y -= ch + 10;
+        }
+        else if (b.t === 'timeline') {
+          need(78);
+          const tw = maxW, tx = M, trackH = 16, trackTop = y - 26, trackBot = trackTop - trackH;
+          fillRect(tx, trackBot, tw, trackH, [0.90, 0.94, 0.92]);
+          (b.dwells || []).forEach(d => fillRect(tx + d.x0 * tw, trackBot, Math.max(1.5, (d.x1 - d.x0) * tw), trackH, [0.78, 0.87, 0.97]));
+          (b.gaps || []).forEach(gp => { const gx = tx + gp.x0 * tw, gw = Math.max(2, (gp.x1 - gp.x0) * tw); fillRect(gx, trackBot, gw, trackH, [0.98, 0.76, 0.33]); put(examFmtDur(gp.durMs), gx + 3, trackBot + 5, 7.5, true, [0.5, 0.33, 0]); });
+          strokeRect(tx, trackBot, tw, trackH, rule, 0.6);
+          (b.flags || []).forEach(f => { const fx = tx + f.x * tw; fillRect(fx - 1, trackTop, 2, 8, [0.70, 0.15, 0.12]); put(f.qId, fx + 3, trackTop + 9, 7, false, [0.70, 0.15, 0.12]); });
+          put(b.startWall || '', tx, trackBot - 12, 8, false, muted);
+          if (b.endWall) put(b.endWall, tx + tw - Math.min(90, b.endWall.length * 4.3), trackBot - 12, 8, false, muted);
+          const ly = trackBot - 26;
+          fillRect(tx, ly, 10, 7, [0.98, 0.76, 0.33]); put('idle gap', tx + 14, ly + 1, 7.5, false, muted);
+          fillRect(tx + 66, ly, 10, 7, [0.78, 0.87, 0.97]); put('long dwell', tx + 80, ly + 1, 7.5, false, muted);
+          fillRect(tx + 156, ly, 2, 7, [0.70, 0.15, 0.12]); put('post-break change', tx + 162, ly + 1, 7.5, false, muted);
+          y = ly - 10;
+        }
       }
     });
     flush();
     return pages;
   }
   // Assemble page content streams into a minimal, valid single-file PDF.
-  function buildPdf(pages) {
+  // An optional logo ({b64,w,h}) is embedded as a JPEG image XObject on every page
+  // (browser only — decoding needs atob; without it the pages keep the text letterhead).
+  function buildPdf(pages, logo) {
+    let imgBin = null;
+    if (logo && logo.b64 && typeof atob === 'function') {
+      try { imgBin = atob(logo.b64); } catch (e) { imgBin = null; }
+    }
+    const hasImg = !!imgBin;
     const objs = [];
     objs[0] = '<</Type/Catalog/Pages 2 0 R>>';
-    const pageNums = pages.map((_, i) => 5 + i * 2);
-    objs[1] = `<</Type/Pages/Kids[${pageNums.map(n => n + ' 0 R').join(' ')}]/Count ${pages.length}>>`;
     objs[2] = '<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>';
     objs[3] = '<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold>>';
+    let base = 5;                       // object number of the first page
+    const logoRef = hasImg ? 5 : 0;
+    if (hasImg) {
+      objs[4] = `<</Type/XObject/Subtype/Image/Width ${logo.w}/Height ${logo.h}/BitsPerComponent 8/ColorSpace/DeviceRGB/Filter/DCTDecode/Length ${imgBin.length}>>\nstream\n${imgBin}\nendstream`;
+      base = 6;
+    }
+    const xobj = hasImg ? `/XObject<</Logo ${logoRef} 0 R>>` : '';
+    const pageNums = pages.map((_, i) => base + i * 2);
+    objs[1] = `<</Type/Pages/Kids[${pageNums.map(n => n + ' 0 R').join(' ')}]/Count ${pages.length}>>`;
     pages.forEach((c, i) => {
-      const pageNo = 5 + i * 2, contentNo = 6 + i * 2;
-      objs[pageNo - 1] = `<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 3 0 R/F2 4 0 R>>>>/Contents ${contentNo} 0 R>>`;
+      const pageNo = base + i * 2, contentNo = base + 1 + i * 2;
+      objs[pageNo - 1] = `<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 3 0 R/F2 4 0 R>>${xobj}>>/Contents ${contentNo} 0 R>>`;
       objs[contentNo - 1] = `<</Length ${c.length}>>\nstream\n${c}\nendstream`;
     });
     let pdf = '%PDF-1.4\n'; const offsets = [];
@@ -3900,22 +3976,49 @@
     };
   }
 
+  // Normalize the exam into a 0..1 timeline so the same geometry drives the
+  // on-screen bar and the PDF: where the idle gaps sit, where dwells sit, and
+  // where post-break answer activity happened.
+  function examTimeline(report) {
+    const ev = report.events;
+    if (!ev.length) return { spanMs: 0, gaps: [], dwells: [], flags: [], startWall: '—', endWall: '—' };
+    const t0 = ev[0].t, span = Math.max(1, ev[ev.length - 1].t - t0), frac = t => Math.max(0, Math.min(1, (t - t0) / span));
+    return {
+      spanMs: span, startWall: report.summary.startWall, endWall: report.summary.endWall,
+      gaps: report.gaps.map(g => ({ x0: frac(g.startT), x1: frac(g.endT), durMs: g.durMs })),
+      dwells: (report.dwells || []).map(d => ({ x0: frac(d.startT), x1: frac(d.endT), durMs: d.durMs, qId: d.qId })),
+      flags: report.flags.map(f => ({ x: frac(f.visit.enterT), qId: f.visit.qId, kind: f.wrongToRight ? 'wrongToRight' : (f.reasons.some(r => r.kind === 'switch') ? 'switch' : 'rapid') })),
+    };
+  }
+
   // Render the report as PDF document blocks for pdfLayout/buildPdf.
   function examReportDocs(report, meta) {
     meta = meta || {};
     const s = report.summary, b = [{ t: 'h', text: 'Exam Activity Screen' }];
     b.push({ t: 'kv', k: 'Exam', v: meta.exam || '(not entered)' });
     b.push({ t: 'kv', k: 'Student', v: meta.student || '(not entered)' });
+    b.push({ t: 'kv', k: 'Reviewed by', v: meta.reviewer || '(not entered)' });
     b.push({ t: 'kv', k: 'Generated', v: meta.date || '' });
-    b.push({ t: 'kv', k: 'Signals to review', v: String(s.reviewCount) });
+    b.push({ t: 'gap', h: 4 });
+    // Verdict banner — lead with the finding, colour-coded by severity.
+    const sev = (s.flagCount || report.extra.some(x => x.severity === 'high')) ? 'flag' : (s.reviewCount ? 'warn' : 'ok');
+    b.push({ t: 'banner', sev, head: s.reviewCount ? `${s.reviewCount} signal${s.reviewCount > 1 ? 's' : ''} to review` : 'Nothing unusual stood out',
+      sub: `${examFmtDur(s.spanMs)} exam   |   ${s.gapCount} break gap${s.gapCount === 1 ? '' : 's'}   |   ${s.flagCount} post-break   |   ${s.extraCount} other` + (s.wrongToRight ? `   |   ${s.wrongToRight} changed->correct` : '') });
+    // Stat cards.
+    b.push({ t: 'cards', items: [
+      { n: examFmtDur(s.spanMs), k: 'Exam span' },
+      { n: String(s.gapCount), k: 'Break gaps', hl: s.gapCount > 0 },
+      { n: examFmtDur(s.longestGapMs), k: 'Longest gap', hl: s.longestGapMs > 0 },
+      { n: String(s.flagCount), k: 'Post-break', hl: s.flagCount > 0 },
+      { n: String(s.extraCount), k: 'Other signals', hl: s.extraCount > 0 },
+    ] });
+    // Visual activity timeline — the gap(s) in context, with post-break markers.
+    const tl = examTimeline(report);
+    b.push({ t: 'sub', text: 'Activity timeline' });
+    b.push({ t: 'timeline', startWall: tl.startWall, endWall: tl.endWall, gaps: tl.gaps, dwells: tl.dwells, flags: tl.flags });
+    b.push({ t: 'kv', k: 'Window', v: `${s.startWall} - ${s.endWall}  (${examFmtDur(s.spanMs)} total, ${examFmtDur(s.idleMs)} idle)` });
+    b.push({ t: 'kv', k: 'Thresholds', v: `gap >= ${examFmtDur(report.opts.gapMs)}, rapid <= ${examFmtDur(report.opts.rapidMs)}, dwell >= ${examFmtDur(report.opts.dwellMs)}` });
     b.push({ t: 'rule' });
-    b.push({ t: 'sub', text: 'Summary' });
-    b.push({ t: 'kv', k: 'Window', v: `${s.startWall} – ${s.endWall}` });
-    b.push({ t: 'kv', k: 'Total span', v: examFmtDur(s.spanMs) });
-    b.push({ t: 'kv', k: 'Idle (break gaps)', v: `${examFmtDur(s.idleMs)} across ${s.gapCount} gap(s)` });
-    b.push({ t: 'kv', k: 'Longest gap', v: examFmtDur(s.longestGapMs) });
-    b.push({ t: 'kv', k: 'Questions seen', v: String(s.questionCount) });
-    b.push({ t: 'kv', k: 'Thresholds', v: `gap ≥ ${examFmtDur(report.opts.gapMs)}, rapid ≤ ${examFmtDur(report.opts.rapidMs)}, dwell ≥ ${examFmtDur(report.opts.dwellMs)}` });
 
     const W_GAP = [0.44, 0.16, 0.40], W_PB = [0.16, 0.16, 0.68], W_OT = [0.20, 0.14, 0.66];
     b.push({ t: 'sub', text: `Inactivity gaps (${report.gaps.length})` });
@@ -4166,7 +4269,7 @@
     };
     const docs = procPacketDocs(d, f);
     if (!docs.length) { $('pkMsg').textContent = 'Pick at least one document to include in the packet.'; return; }
-    const bytes = buildPdf(pdfLayout(docs));
+    const bytes = buildPdf(pdfLayout(docs, { logo: PDF_LOGO }), PDF_LOGO);
     const blob = new Blob([bytes], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -4290,6 +4393,7 @@
     const sub = `${examFmtDur(s.spanMs)} exam · ${s.gapCount} break gap${s.gapCount === 1 ? '' : 's'} · ${s.flagCount} post-break · ${s.extraCount} other` + (s.wrongToRight ? ` · ${s.wrongToRight} changed→correct` : '');
     let html = '';
     if (who) html += `<div class="exam-who">${esc(who)}${meta.takerAuto ? ' <span class="exam-dim">(ID auto-detected from log)</span>' : ''}</div>`;
+    if (meta.reviewer) html += `<div class="exam-dim" style="margin:-0.2rem 0 0.5rem">Reviewed by ${esc(meta.reviewer)}</div>`;
     html += `<div class="exam-verdict ${sev}"><span class="v-head">${esc(head)}</span><span class="v-sub">${esc(sub)}</span></div>`;
 
     // Compact stat chips.
@@ -4300,6 +4404,16 @@
       stat(examFmtDur(s.longestGapMs), 'Longest gap', s.longestGapMs ? 'warn' : '') +
       stat(s.flagCount, 'Post-break flags', s.flagCount ? 'flag' : '') +
       stat(s.extraCount, 'Other signals', s.extraCount ? 'warn' : '') + '</div>';
+
+    // Visual activity timeline — the exam at a glance: where the idle gap(s) sit and where answers changed after.
+    const tl = examTimeline(report);
+    if (tl.spanMs) {
+      html += `<div class="exam-tl"><div class="exam-tl-head">Activity timeline <span class="exam-dim">${esc(s.startWall + ' → ' + s.endWall + '  ·  ' + examFmtDur(s.spanMs))}</span></div><div class="exam-tl-track">`;
+      tl.dwells.forEach(d => { html += `<div class="exam-tl-dwell" style="left:${(d.x0 * 100).toFixed(2)}%;width:${Math.max(0.6, (d.x1 - d.x0) * 100).toFixed(2)}%" title="Long dwell on ${esc(d.qId)} (${esc(examFmtDur(d.durMs))})"></div>`; });
+      tl.gaps.forEach(g => { html += `<div class="exam-tl-gap" style="left:${(g.x0 * 100).toFixed(2)}%;width:${Math.max(0.8, (g.x1 - g.x0) * 100).toFixed(2)}%" title="Idle ${esc(examFmtDur(g.durMs))}"><span>${esc(examFmtDur(g.durMs))}</span></div>`; });
+      tl.flags.forEach(f => { html += `<div class="exam-tl-flag ${f.kind === 'wrongToRight' ? 'w2r' : ''}" style="left:${(f.x * 100).toFixed(2)}%" title="Post-break ${esc(f.kind)} on ${esc(f.qId)}"></div>`; });
+      html += `</div><div class="exam-tl-legend"><span class="lg gap">idle gap</span><span class="lg dwell">long dwell</span><span class="lg flag">post-break change</span></div></div>`;
+    }
 
     // Inactivity gaps.
     let gapsBody;
@@ -4336,12 +4450,12 @@
     html += examAcc('Other signals', report.extra.length, report.extra.some(x => x.severity === 'high'), exBody);
 
     // Full timeline (collapsed).
-    let tl = '<table class="exam-tbl"><thead><tr><th>#</th><th>Question</th><th>Entered</th><th>Time on Q</th><th>rvNum</th><th>Note</th></tr></thead><tbody>' +
+    const tlTable = '<table class="exam-tbl"><thead><tr><th>#</th><th>Question</th><th>Entered</th><th>Time on Q</th><th>rvNum</th><th>Note</th></tr></thead><tbody>' +
       report.visits.map((v, i) => {
         const note = v.revisit ? ('revisit' + (v.rvDelta != null && v.rvDelta > 0 ? ` — answer changed (rvNum ${v.prevRv}→${v.rvNum})` : '')) : '';
         return `<tr><td>${i + 1}</td><td>${esc(v.qId)}</td><td>${esc(examFmtClock({ wall: v.enterWall, t: v.enterT }))}</td><td>${esc(examFmtDur(v.durMs))}</td><td>${v.rvNum}</td><td>${esc(note)}</td></tr>`;
       }).join('') + '</tbody></table>';
-    html += examAcc('Full question timeline', report.visits.length, false, tl);
+    html += examAcc('Full question timeline', report.visits.length, false, tlTable);
 
     if (report.responses && !report.responses.ok)
       html += '<p class="hint">Responses CSV loaded but could not be joined (no clear question-id + correctness column found) — correctness left blank.</p>';
@@ -4367,7 +4481,7 @@
     // Who this report is for: the typed label, else an ID auto-detected in the log.
     let student = $('examStudent').value.trim(), takerAuto = false;
     if (!student && report.taker) { student = report.taker.value; $('examStudent').value = student; takerAuto = true; if ($('examLabelWrap')) $('examLabelWrap').open = true; }
-    const meta = { exam: $('examExam').value.trim(), student, takerAuto };
+    const meta = { exam: $('examExam').value.trim(), student, reviewer: $('examReviewer').value.trim(), takerAuto };
     lastExamReport = report; lastExamMeta = meta;
     examRender(report, meta);
     const dd = report.dupesRemoved ? ` · ${report.dupesRemoved} dup rows collapsed` : '';
@@ -4378,15 +4492,15 @@
     $('examMsg').textContent = '';
   }
   function examReset() {
-    ['examLog', 'examResp', 'examExam', 'examStudent'].forEach(id => { $(id).value = ''; });
+    ['examLog', 'examResp', 'examExam', 'examStudent', 'examReviewer'].forEach(id => { $(id).value = ''; });
     $('examOut').innerHTML = '';
     $('examMsg').textContent = ''; lastExamReport = null; lastExamMeta = {}; examShowInput(true);
   }
   function examDownloadPdf() {
     if (!lastExamReport) return;
     let date = ''; try { date = new Date().toLocaleString(); } catch (e) {}
-    const docs = examReportDocs(lastExamReport, { date, exam: lastExamMeta.exam, student: lastExamMeta.student });
-    const bytes = buildPdf(pdfLayout(docs, { headerLabel: 'Exam activity screen' }));
+    const docs = examReportDocs(lastExamReport, { date, exam: lastExamMeta.exam, student: lastExamMeta.student, reviewer: lastExamMeta.reviewer });
+    const bytes = buildPdf(pdfLayout(docs, { headerLabel: 'Exam activity screen', logo: PDF_LOGO }), PDF_LOGO);
     const blob = new Blob([bytes], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -4401,7 +4515,14 @@
     $('examPdf').onclick = examDownloadPdf;
     $('examEdit').onclick = () => examShowInput(true);
     $('examNew').onclick = examReset;
-    $('examExample').onclick = () => { $('examLog').value = EXAM_EXAMPLE; examRun(); };
+    $('examExample').onclick = () => {
+      $('examLog').value = EXAM_EXAMPLE;
+      if (!$('examExam').value) $('examExam').value = 'MD4 Example Exam (sample data)';
+      if (!$('examStudent').value) $('examStudent').value = 'Sample Student';
+      if (!$('examReviewer').value) $('examReviewer').value = 'Dr. Jane Reviewer';
+      if ($('examLabelWrap')) $('examLabelWrap').open = true;
+      examRun();
+    };
     $('examOpen').onclick = () => $('examLogFile').click();
     $('examLogFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if (f) examReadFile(f, 'examLog'); });
     $('examRespOpen').onclick = () => { const w = $('examKeyWrap'); if (w) w.open = true; $('examRespFile').click(); };

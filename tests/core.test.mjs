@@ -25,7 +25,7 @@ assert.ok(XLSX && XLSX.utils, 'SheetJS failed to load');
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const m = html.match(/<script>\s*([\s\S]*?)<\/script>\s*<\/body>/i);
 assert.ok(m, 'could not locate the app <script> block');
-const appSrc = m[1] + '\n;globalThis.__app = { validate, parseWorkbook, buildWorkbook, parsePasted, solve, defaultWeights, makeExample, resultSheets, procDecide, procPacketDocs, procQuoteEmail, pdfLayout, buildPdf, examParseLog, examBuildVisits, examFindGaps, examFindDwells, examFlagPostBreak, examExtraSignals, examScreen, examReportDocs, examParseResponses, EXAM_EXAMPLE, TEMPLATE, SCHEMA, SHEET_ORDER };';
+const appSrc = m[1] + '\n;globalThis.__app = { validate, parseWorkbook, buildWorkbook, parsePasted, solve, defaultWeights, makeExample, resultSheets, procDecide, procPacketDocs, procQuoteEmail, pdfLayout, buildPdf, examParseLog, examBuildVisits, examFindGaps, examFindDwells, examFlagPostBreak, examExtraSignals, examScreen, examReportDocs, examTimeline, examParseResponses, EXAM_EXAMPLE, TEMPLATE, SCHEMA, SHEET_ORDER };';
 
 // 3. Minimal stubs for the DOM/browser globals referenced at load time.
 const stubEl = () => new Proxy({}, {
@@ -483,5 +483,19 @@ for (const pg of longPages) {
 }
 assert.ok(maxRight <= PAGE_RIGHT, `report text must stay within the page (widest ${maxRight.toFixed(1)} <= ${PAGE_RIGHT})`);
 console.log(`✓ exam report PDF wraps within the page (widest text ends at ${maxRight.toFixed(1)}pt of ${PAGE_RIGHT}pt)`);
+
+// --- Test 24: activity timeline geometry (normalized 0..1 positions) --------
+const tlRep = app.examScreen(app.EXAM_EXAMPLE, { gapMin: 4, rapidSec: 8, dwellMin: 5 });
+const tl = app.examTimeline(tlRep);
+assert.ok(tl.spanMs > 0, 'timeline has a positive span');
+assert.equal(tl.gaps.length, tlRep.gaps.length, 'one timeline segment per break gap');
+assert.ok(tl.gaps.every(g => g.x0 >= 0 && g.x1 <= 1 && g.x1 > g.x0), 'gap segments are within 0..1 and ordered');
+assert.ok(tl.dwells.some(d => d.qId === 'Q6'), 'the Q6 dwell appears on the timeline');
+assert.equal(tl.flags.length, tlRep.flags.length, 'one marker per post-break flag');
+assert.ok(tl.flags.every(f => f.x >= 0 && f.x <= 1), 'flag markers are within 0..1');
+// The gap sits in the first half (it happens early in the example) and Q6 dwell at the end.
+assert.ok(tl.gaps[0].x0 < 0.6, 'the example gap starts in the first part of the exam');
+assert.ok(tl.dwells.find(d => d.qId === 'Q6').x1 > 0.9, 'the closing dwell reaches the end of the timeline');
+console.log('✓ activity timeline maps gaps, dwells, and post-break markers onto a 0..1 axis');
 
 console.log('\nALL TESTS PASSED');

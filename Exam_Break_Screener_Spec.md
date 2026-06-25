@@ -68,6 +68,15 @@ suppresses the corresponding signals. The report leads with a one-line **verdict
 review) and groups the detail into collapsible sections, so the first screen isn't a wall of tables.
 
 ## 4. Output
+The on-screen report and the **PDF** share the same structure, built to communicate at a glance:
+a JABSOM letterhead (embedded crest + OME wordmark), a colour-coded **verdict banner**
+("N signals to review"), **stat cards**, and an **activity timeline** — a horizontal track where
+the idle gap(s) show as amber blocks (labelled with duration), long dwells as blue blocks, and
+post-break answer changes as red markers — so a reviewer instantly sees *where* the break was and
+*where* answers changed. The report is labelled with **Exam / Student / Reviewer** (the reviewer
+field is optional). Detail tables (gaps, post-break activity, other signals, full timeline) follow.
+
+### Detail
 - Summary cards (exam span, gaps over threshold, longest gap, post-break flags, questions seen).
 - An **inactivity-gaps** table and a **post-break activity** table (with switch/rapid/correctness pills).
 - A collapsible full question timeline (per-visit duration + `rvNum` + revisit note).
