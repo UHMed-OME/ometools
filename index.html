@@ -3024,15 +3024,30 @@
       `<button class="os-tool${t.id === activeTool ? ' active' : ''}" data-tool="${t.id}"${t.available ? '' : ' disabled'} title="${escapeAttr(t.name)}">` +
       `${ICONS[t.icon] || ICONS.tools}<span class="label">${escapeHtml(t.name)}</span>${t.available ? '' : '<span class="soon">soon</span>'}</button>`).join('');
   }
-  function selectTool(id) {
+  function selectTool(id, fromUrl) {
     const t = TOOLS.find(x => x.id === id); if (!t || !t.available) return;
     activeTool = id;
     document.querySelectorAll('.tool-panel').forEach(p => { p.hidden = p.id !== 'tool-' + id; });
     document.querySelectorAll('.tool-actions').forEach(a => { a.hidden = a.dataset.tool !== id; });   // top-bar actions follow the active tool
     $('osTools').querySelectorAll('.os-tool').forEach(b => b.classList.toggle('active', b.dataset.tool === id));
+    // Reflect the active tool in the URL so each tool is directly linkable/bookmarkable.
+    if (!fromUrl) { try { if ((location.hash || '').replace(/^#\/?/, '') !== id) location.hash = id; } catch (e) {} }
   }
+  // Deep-linking: "#exam", "#/exam", or "?tool=exam" opens that tool directly (defaults to PBL).
+  function toolFromUrl() {
+    if (typeof location === 'undefined') return null;
+    let id = '';
+    try {
+      id = (location.hash || '').replace(/^#\/?/, '').toLowerCase();
+      if (!id && typeof URLSearchParams !== 'undefined') id = (new URLSearchParams(location.search).get('tool') || '').toLowerCase();
+    } catch (e) { return null; }
+    return TOOLS.find(t => t.id === id && t.available) ? id : null;
+  }
+  function applyToolFromUrl() { const id = toolFromUrl(); if (id) selectTool(id, true); }
   renderTools();
   $('osTools').addEventListener('click', (e) => { const b = e.target.closest('.os-tool'); if (b && !b.disabled) selectTool(b.dataset.tool); });
+  if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('hashchange', applyToolFromUrl);
+  applyToolFromUrl();   // honor a deep link on first load
   function setNavCollapsed(on) { $('os').classList.toggle('collapsed', on); try { localStorage.setItem('pbl.navCollapsed', on ? '1' : '0'); } catch (e) {} }
   $('osCollapse').onclick = () => setNavCollapsed(!$('os').classList.contains('collapsed'));
   try { if (localStorage.getItem('pbl.navCollapsed') === '1') setNavCollapsed(true); } catch (e) {}
@@ -4358,7 +4373,7 @@
   // immediately. Gated on a real DOM (skipped under the headless test harness).
   if (typeof document !== 'undefined' && document.body) {
     loadWorkbook(makeExample(), 'Example data (80 students) — edit freely', null, true);
-    if (!tourSeen()) setTimeout(startTour, 700);   // first-run spotlight tour (re-runnable from ?)
+    if (!tourSeen() && activeTool === 'pbl') setTimeout(startTour, 700);   // first-run spotlight tour (skip if deep-linked elsewhere)
   }
   </script>
 </body>

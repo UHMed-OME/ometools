@@ -26,7 +26,15 @@ SheetJS and the logo are inlined into the single file; nothing loads from a CDN.
   print/save a PDF roster.
 
 ## Other tools in this toolkit
-The same offline shell hosts additional OME tools (pick them from the left sidebar):
+The same offline shell hosts additional OME tools (pick them from the left sidebar, or link
+straight to one). Each tool is **directly linkable** by URL hash — the link updates as you switch,
+and browser back/forward move between tools:
+
+- PBL Group Builder — [`…/ometools/#pbl`](https://uhmed-ome.github.io/ometools/#pbl)
+- Procurement Wizard — [`…/ometools/#proc`](https://uhmed-ome.github.io/ometools/#proc)
+- Exam Break Screener — [`…/ometools/#exam`](https://uhmed-ome.github.io/ometools/#exam)
+
+(`?tool=exam` also works.) The tools:
 
 - **Procurement Wizard** — a step-by-step guide that turns *what you're buying* + *funding source* + *amount* into the right method, forms, routing, and a generated submission-packet PDF (UH/State and RCUH rules built in). No student data; all client-side.
 - **Exam Break Screener** — parses an ExamSoft **snapshot log** (the per-event `[NAVIGATION]` data, `qsEntr`/`qsExt` with timestamps) to surface, for one student's exam:
