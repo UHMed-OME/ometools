@@ -451,4 +451,17 @@ assert.ok(exStr.includes('%%EOF') && /\nxref\n/.test(exStr), 'report has xref + 
 assert.ok(exStr.includes('Exam Activity Screen'), 'report renders its heading');
 console.log('✓ exam screener: responses join marks correctness and the PDF report is valid');
 
+// --- Test 22: best-effort taker-ID detection + labeled report ---------------
+assert.equal(app.examParseLog(app.EXAM_EXAMPLE).taker, null, 'the plain navigation example embeds no taker id');
+const idLog = '5/1/2026 8:00:00 AM [INFO] {"takerId":"STU-12345","examId":"MD4"}\n' + app.EXAM_EXAMPLE;
+const idParsed = app.examParseLog(idLog);
+assert.ok(idParsed.taker && idParsed.taker.value === 'STU-12345', 'detects an embedded takerId when the log carries one');
+assert.equal(idParsed.events.length, app.examParseLog(app.EXAM_EXAMPLE).events.length, 'the id line is not counted as a navigation event');
+const idRep = app.examScreen(idLog, { gapMin: 4 });
+assert.ok(idRep.taker && idRep.taker.value === 'STU-12345', 'examScreen surfaces the detected taker');
+const whoDocs = app.examReportDocs(idRep, { student: 'STU-12345', exam: 'MD4 Final' });
+const whoPdf = Array.from(app.buildPdf(app.pdfLayout(whoDocs))).map(c => String.fromCharCode(c)).join('');
+assert.ok(whoPdf.includes('STU-12345') && whoPdf.includes('MD4 Final'), 'the report PDF prints the student + exam label');
+console.log('✓ exam screener: taker-ID auto-detection and labeled report');
+
 console.log('\nALL TESTS PASSED');

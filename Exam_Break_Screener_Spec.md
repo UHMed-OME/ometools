@@ -31,6 +31,14 @@ ExamSoft's *View Exam Snapshot Log* emits one line per event:
 
 ExamSoft commonly emits each event **twice**; the parser de-duplicates identical `(qId, evt, log)` rows.
 
+**Identity.** The snapshot log is **per-student** — you pick the exam-taker in ExamSoft, then view
+*their* log — so the `[NAVIGATION]` events carry no taker ID, and within one log every flag is that
+one student. The tool therefore lets you **label the report** (Exam + Student/taker ID) so the report
+says who it's for. As a fallback, `examDetectId` scans every line's JSON for an identity-looking key
+(`takerId`/`candidate`/`studentId`/`email`/…) and, if a real export embeds one, pre-fills the Student
+field. Attributing flags across *many* students at once is **batch mode** — a future feature; today
+it's one log = one student.
+
 A key distinction underlies the signals: a long span **between** questions (after a `qsExt`,
 before the next `qsEntr`) is *idle with nothing open* — a **break candidate**. A long span
 **inside** a question (`qsEntr` → its `qsExt`) is a **dwell** — the student never left the

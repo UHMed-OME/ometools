@@ -1015,6 +1015,9 @@
         #tool-exam .exam-controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin: 0.2rem 0 0.4rem; }
         #tool-exam .exam-controls label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.8rem; color: var(--muted, #5a6b62); }
         #tool-exam .exam-controls input[type=number] { width: 6rem; padding: 0.35rem 0.5rem; border: 1px solid var(--line); border-radius: 7px; font: inherit; }
+        #tool-exam .exam-controls input[type=text] { padding: 0.35rem 0.5rem; border: 1px solid var(--line); border-radius: 7px; font: inherit; }
+        #tool-exam .exam-controls label.exam-wide { flex: 1 1 14rem; }
+        #tool-exam .exam-controls label.exam-wide input { width: 100%; box-sizing: border-box; }
         #tool-exam .iconbtn { width: auto; padding: 0 0.95rem; height: 38px; white-space: nowrap; }
         #tool-exam .exam-actions { display: flex; gap: 0.7rem; flex-wrap: wrap; align-items: center; margin: 0.4rem 0 0; }
         #tool-exam .exam-msg { font-size: 0.82rem; color: var(--muted, #5a6b62); margin-left: 0.3rem; }
@@ -1049,6 +1052,7 @@
           border: 1px solid var(--line); border-radius: 10px; background: var(--bg, #f4f7f5); }
         #tool-exam .exam-loaded[hidden] { display: none; }
         #tool-exam .exam-loaded-info { font-size: 0.85rem; color: var(--brand, #024731); margin-right: auto; }
+        #tool-exam .exam-who { font-size: 0.95rem; font-weight: 700; color: var(--brand, #024731); margin-bottom: 0.4rem; }
         #tool-exam .exam-verdict { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; padding: 0.7rem 1rem; border-radius: 10px; margin-bottom: 0.9rem; border: 1px solid var(--line); }
         #tool-exam .exam-verdict.flag { background: #fdeceb; border-color: #f3c9c6; }
         #tool-exam .exam-verdict.warn { background: #fff6e6; border-color: #f0dcae; }
@@ -1098,6 +1102,15 @@
                   <button class="iconbtn" id="examRespOpen" title="Open a responses CSV">Open CSV…</button>
                 </div>
               </div>
+            </details>
+
+            <details class="exam-more" id="examLabelWrap">
+              <summary>Label this report <span class="exam-dim">— optional, so the report says who it’s for</span></summary>
+              <div class="exam-controls">
+                <label class="exam-wide">Exam<input type="text" id="examExam" placeholder="e.g. MD4 PBL/Lecture Final 2026"></label>
+                <label class="exam-wide">Student / taker ID<input type="text" id="examStudent" placeholder="name or ID (one student per log)"></label>
+              </div>
+              <p class="hint">The snapshot log is per-student — you pick the exam-taker in ExamSoft, then view their log. If a log happens to embed an ID, it’s detected and pre-filled here.</p>
             </details>
 
             <details class="exam-more">
@@ -3640,17 +3653,35 @@
     try { return new Date(t).toLocaleTimeString(); } catch (e) { return String(t); }
   }
 
+  // Best-effort: pull a taker/candidate identifier out of a log line's JSON, if
+  // one is present. The [NAVIGATION] events don't carry it (qId/ans/rvNum/evt/log),
+  // but a real export may include it on a header/other line — surfaced if so.
+  function examDetectId(o) {
+    if (!o || typeof o !== 'object') return null;
+    const re = /^(taker\s*id|takerid|taker|candidate\s*id|candidateid|candidate|examinee\s*id|examinee|student\s*id|studentid|student|user\s*id|userid|sso\s*id|ssoid|email|username|name)$/i;
+    for (const k of Object.keys(o)) {
+      const v = o[k];
+      if (re.test(k) && v != null && typeof v !== 'object' && String(v).trim()) return { key: k, value: String(v).trim() };
+    }
+    return null;
+  }
+
   // Parse log text → sorted, de-duplicated event list. Tolerant of noise:
   // only lines carrying a [NAVIGATION] JSON object with evt + log are kept.
+  // Also surfaces a taker id from any line's JSON, if the export embeds one.
   function examParseLog(text) {
     const events = [], errors = [];
+    let taker = null;
     for (const raw of String(text || '').split(/\r?\n/)) {
       const line = raw.trim();
-      if (!line || line.indexOf('[NAVIGATION]') < 0) continue;
       const lo = line.indexOf('{'), hi = line.lastIndexOf('}');
-      if (lo < 0 || hi <= lo) continue;
-      let o;
-      try { o = JSON.parse(line.slice(lo, hi + 1)); } catch (e) { errors.push(line); continue; }
+      let o = null;
+      if (lo >= 0 && hi > lo) {
+        try { o = JSON.parse(line.slice(lo, hi + 1)); }
+        catch (e) { if (line.indexOf('[NAVIGATION]') >= 0) errors.push(line); }
+      }
+      if (o && !taker) taker = examDetectId(o);
+      if (!line || line.indexOf('[NAVIGATION]') < 0) continue;
       if (!o || typeof o.evt !== 'string' || o.log == null) continue;
       // Wall-clock prefix before "[NAVIGATION]" is the operator-facing local time.
       const wall = (line.slice(0, line.indexOf('[NAVIGATION]')).trim()) || '';
@@ -3673,7 +3704,7 @@
       if (p && p.qId === e.qId && p.evt === e.evt && p.t === e.t) continue;
       out.push(e);
     }
-    return { events: out, errors, dupesRemoved: events.length - out.length };
+    return { events: out, errors, dupesRemoved: events.length - out.length, taker };
   }
 
   // Pair qsEntr → qsExt into per-question visits, flagging revisits (a qId
@@ -3832,7 +3863,7 @@
     const longest = gaps.reduce((m, g) => Math.max(m, g.durMs), 0);
     const wrongToRight = flags.filter(f => f.wrongToRight).length;
     return {
-      events, visits, gaps, dwells, flags, extra, responses,
+      events, visits, gaps, dwells, flags, extra, responses, taker: parsed.taker,
       parseErrors: parsed.errors.length, dupesRemoved: parsed.dupesRemoved,
       opts: { gapMs, rapidMs, dwellMs, burstWinMs },
       summary: {
@@ -4210,7 +4241,7 @@
   if (typeof document !== 'undefined' && document.body) { initProcurement(); initWizard(); }
 
   // ---- Exam Break Screener: DOM wiring (engine is the pure exam* functions) ----
-  let lastExamReport = null;
+  let lastExamReport = null, lastExamMeta = {};
   function examReadFile(file, into) {
     const fr = new FileReader();
     fr.onload = () => { $(into).value = String(fr.result || ''); };
@@ -4220,15 +4251,21 @@
   function examAcc(title, count, open, body) {
     return `<details class="exam-acc"${open ? ' open' : ''}><summary>${escapeHtml(title)} <span class="count">(${count})</span></summary><div class="acc-body">${body}</div></details>`;
   }
-  function examRender(report) {
+  function examRender(report, meta) {
     const s = report.summary, esc = escapeHtml;
+    meta = meta || {};
+
+    // Who this report is about (one student per log).
+    const who = [meta.student, meta.exam].filter(Boolean).join(' · ');
 
     // Headline verdict — one glance: anything to look at, and how serious.
     const rc = s.reviewCount;
     const sev = (s.flagCount || report.extra.some(x => x.severity === 'high')) ? 'flag' : (rc > 0 ? 'warn' : 'ok');
     const head = rc > 0 ? `⚑ ${rc} signal${rc > 1 ? 's' : ''} to review` : '✓ Nothing unusual stood out';
     const sub = `${examFmtDur(s.spanMs)} exam · ${s.gapCount} break gap${s.gapCount === 1 ? '' : 's'} · ${s.flagCount} post-break · ${s.extraCount} other` + (s.wrongToRight ? ` · ${s.wrongToRight} changed→correct` : '');
-    let html = `<div class="exam-verdict ${sev}"><span class="v-head">${esc(head)}</span><span class="v-sub">${esc(sub)}</span></div>`;
+    let html = '';
+    if (who) html += `<div class="exam-who">${esc(who)}${meta.takerAuto ? ' <span class="exam-dim">(ID auto-detected from log)</span>' : ''}</div>`;
+    html += `<div class="exam-verdict ${sev}"><span class="v-head">${esc(head)}</span><span class="v-sub">${esc(sub)}</span></div>`;
 
     // Compact stat chips.
     const stat = (n, k, cls) => `<div class="stat ${cls || ''}"><div class="n">${esc(String(n))}</div><div class="k">${esc(k)}</div></div>`;
@@ -4302,22 +4339,28 @@
       responses,
     });
     if (!report.summary.eventCount) { $('examMsg').textContent = 'No [NAVIGATION] events found — is this an ExamSoft snapshot log?'; $('examOut').innerHTML = ''; return; }
-    lastExamReport = report;
-    examRender(report);
+    // Who this report is for: the typed label, else an ID auto-detected in the log.
+    let student = $('examStudent').value.trim(), takerAuto = false;
+    if (!student && report.taker) { student = report.taker.value; $('examStudent').value = student; takerAuto = true; if ($('examLabelWrap')) $('examLabelWrap').open = true; }
+    const meta = { exam: $('examExam').value.trim(), student, takerAuto };
+    lastExamReport = report; lastExamMeta = meta;
+    examRender(report, meta);
     const dd = report.dupesRemoved ? ` · ${report.dupesRemoved} dup rows collapsed` : '';
     const warn = report.parseErrors ? ` · ${report.parseErrors} line(s) skipped` : '';
-    $('examLoadedInfo').textContent = `✓ Screened ${report.summary.eventCount} events · ${report.summary.startWall}–${report.summary.endWall}${dd}${warn}`;
+    const who = [meta.student, meta.exam].filter(Boolean).join(' · ');
+    $('examLoadedInfo').textContent = `✓ Screened ${report.summary.eventCount} events${who ? ' · ' + who : ''} · ${report.summary.startWall}–${report.summary.endWall}${dd}${warn}`;
     examShowInput(false);
     $('examMsg').textContent = '';
   }
   function examReset() {
-    $('examLog').value = ''; $('examResp').value = ''; $('examOut').innerHTML = '';
-    $('examMsg').textContent = ''; lastExamReport = null; examShowInput(true);
+    ['examLog', 'examResp', 'examExam', 'examStudent'].forEach(id => { $(id).value = ''; });
+    $('examOut').innerHTML = '';
+    $('examMsg').textContent = ''; lastExamReport = null; lastExamMeta = {}; examShowInput(true);
   }
   function examDownloadPdf() {
     if (!lastExamReport) return;
     let date = ''; try { date = new Date().toLocaleString(); } catch (e) {}
-    const docs = examReportDocs(lastExamReport, { date });
+    const docs = examReportDocs(lastExamReport, { date, exam: lastExamMeta.exam, student: lastExamMeta.student });
     const bytes = buildPdf(pdfLayout(docs, { headerLabel: 'Exam activity screen' }));
     const blob = new Blob([bytes], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
@@ -4337,29 +4380,6 @@
     $('examOpen').onclick = () => $('examLogFile').click();
     $('examLogFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if (f) examReadFile(f, 'examLog'); });
     $('examRespOpen').onclick = () => { const w = $('examKeyWrap'); if (w) w.open = true; $('examRespFile').click(); };
-    $('examRespFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if (f) examReadFile(f, 'examResp'); });
-  }
-  function examDownloadPdf() {
-    if (!lastExamReport) return;
-    let date = ''; try { date = new Date().toLocaleString(); } catch (e) {}
-    const docs = examReportDocs(lastExamReport, { date });
-    const bytes = buildPdf(pdfLayout(docs, { headerLabel: 'Exam activity screen' }));
-    const blob = new Blob([bytes], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'Exam_Activity_Screen.pdf';
-    document.body.appendChild(a); a.click();
-    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
-    if (typeof toast === 'function') toast('Report saved to your downloads.');
-  }
-  function initExam() {
-    if (!$('examRun')) return;
-    $('examRun').onclick = examRun;
-    $('examPdf').onclick = examDownloadPdf;
-    $('examExample').onclick = () => { $('examLog').value = EXAM_EXAMPLE; examRun(); };
-    $('examOpen').onclick = () => $('examLogFile').click();
-    $('examLogFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if (f) examReadFile(f, 'examLog'); });
-    $('examRespOpen').onclick = () => $('examRespFile').click();
     $('examRespFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if (f) examReadFile(f, 'examResp'); });
   }
   if (typeof document !== 'undefined' && document.body) initExam();
